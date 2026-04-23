@@ -1,4 +1,8 @@
-import type { SkillJudge, SkillJudgeRequest, SkillJudgeResponse } from '../../../domain/contract/ports/SkillJudge.js';
+import type {
+  SkillJudge,
+  SkillJudgeRequest,
+  SkillJudgeResponse,
+} from '../../../domain/contract/ports/SkillJudge.js';
 
 /**
  * Fake implementation of SkillJudge.

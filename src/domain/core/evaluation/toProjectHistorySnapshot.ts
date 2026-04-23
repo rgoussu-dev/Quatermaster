@@ -10,9 +10,7 @@ import type { DimensionScore } from '../../contract/DimensionScore.js';
  * Drops findings and topRecommendations — history only needs enough signal
  * to show score movement between runs.
  */
-export function toProjectHistorySnapshot(
-  result: EvaluationResult,
-): ProjectHistorySnapshot {
+export function toProjectHistorySnapshot(result: EvaluationResult): ProjectHistorySnapshot {
   return {
     projectPath: result.projectPath,
     evaluatedAt: result.evaluatedAt,

@@ -211,9 +211,7 @@ describe('EvaluateSkill (workspace + fitness)', () => {
         },
       ],
     ]);
-    const judgeResponses = new Map([
-      ['seeded', { score: 90, observations: ['left file alone'] }],
-    ]);
+    const judgeResponses = new Map([['seeded', { score: 90, observations: ['left file alone'] }]]);
 
     const mediator = buildWorkspaceMediator(dataset, outcomes, judgeResponses);
     const result = await mediator.dispatch(new EvaluateSkill(SKILL_PATH, DATASET_PATH));

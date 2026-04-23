@@ -42,42 +42,44 @@ export class EvaluateSkillHandler implements Handler<EvaluateSkill> {
   }
 
   async handle(action: EvaluateSkill): Promise<Result<SkillEvaluationResult>> {
+    let dataset;
     try {
-      const dataset = await this.datasetLoader.load(action.datasetPath);
+      dataset = await this.datasetLoader.load(action.datasetPath);
+    } catch (err) {
+      return failure(SkillEvaluationError.datasetLoadFailed(errorMessage(err)));
+    }
 
-      const caseResults = await Promise.all(
+    let caseResults;
+    try {
+      caseResults = await Promise.all(
         dataset.cases.map((skillCase) => this.evaluateCase(action.skillPath, skillCase)),
       );
-
-      const passedCases = caseResults.filter((r) => r.passed).length;
-      const scenarioBreakdown = buildScenarioBreakdown(caseResults);
-
-      const result: SkillEvaluationResult = {
-        skillPath: action.skillPath,
-        datasetPath: action.datasetPath,
-        evaluatedAt: new Date().toISOString(),
-        passRate: dataset.cases.length === 0 ? 0 : passedCases / dataset.cases.length,
-        totalCases: dataset.cases.length,
-        passedCases,
-        cases: caseResults,
-        ...(scenarioBreakdown ? { scenarioBreakdown } : {}),
-      };
-      return success(result);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes('dataset') || message.includes('load')) {
-        return failure(SkillEvaluationError.datasetLoadFailed(message));
+      if (err instanceof SkillJudgeFailure) {
+        return failure(SkillEvaluationError.skillJudgeFailed(err.message));
       }
-      return failure(SkillEvaluationError.skillRunFailed(message));
+      return failure(SkillEvaluationError.skillRunFailed(errorMessage(err)));
     }
+
+    const passedCases = caseResults.filter((r) => r.passed).length;
+    const scenarioBreakdown = buildScenarioBreakdown(caseResults);
+
+    const result: SkillEvaluationResult = {
+      skillPath: action.skillPath,
+      datasetPath: action.datasetPath,
+      evaluatedAt: new Date().toISOString(),
+      passRate: dataset.cases.length === 0 ? 0 : passedCases / dataset.cases.length,
+      totalCases: dataset.cases.length,
+      passedCases,
+      cases: caseResults,
+      ...(scenarioBreakdown ? { scenarioBreakdown } : {}),
+    };
+    return success(result);
   }
 
-  private async evaluateCase(
-    skillPath: string,
-    skillCase: SkillCase,
-  ): Promise<SkillCaseResult> {
+  private async evaluateCase(skillPath: string, skillCase: SkillCase): Promise<SkillCaseResult> {
     if (this.workspace) {
-      return this.evaluateCaseWithWorkspace(skillPath, skillCase);
+      return this.evaluateCaseWithWorkspace(skillPath, skillCase, this.workspace);
     }
     return this.evaluateCaseTextOnly(skillPath, skillCase);
   }
@@ -87,7 +89,7 @@ export class EvaluateSkillHandler implements Handler<EvaluateSkill> {
     skillCase: SkillCase,
   ): Promise<SkillCaseResult> {
     const actualOutput = await this.skillRunner.run(skillPath, skillCase.prompt);
-    const judgement = await this.skillJudge.judge({
+    const judgement = await this.runJudge({
       actualOutput,
       expectedBehavior: skillCase.expectedBehavior,
     });
@@ -106,27 +108,20 @@ export class EvaluateSkillHandler implements Handler<EvaluateSkill> {
   private async evaluateCaseWithWorkspace(
     skillPath: string,
     skillCase: SkillCase,
+    workspace: AgentRunWorkspace,
   ): Promise<SkillCaseResult> {
-    const workspace = this.workspace;
-    if (!workspace) {
-      throw new Error('workspace missing in evaluateCaseWithWorkspace');
-    }
     const outcome = await workspace.run({
       skillPath,
       userPrompt: skillCase.prompt,
       ...(skillCase.seedRepoPath ? { seedRepoPath: skillCase.seedRepoPath } : {}),
     });
 
-    const judgement = await this.skillJudge.judge({
+    const judgement = await this.runJudge({
       actualOutput: outcome.stdout,
       expectedBehavior: skillCase.expectedBehavior,
     });
 
-    const { overallScore, metrics } = this.fitnessScorer.score(
-      skillCase,
-      outcome,
-      judgement,
-    );
+    const { overallScore, metrics } = this.fitnessScorer.score(skillCase, outcome, judgement);
 
     return {
       id: skillCase.id,
@@ -140,6 +135,28 @@ export class EvaluateSkillHandler implements Handler<EvaluateSkill> {
       ...(skillCase.scenarioType ? { scenarioType: skillCase.scenarioType } : {}),
     };
   }
+
+  private async runJudge(request: {
+    actualOutput: string;
+    expectedBehavior: string;
+  }): ReturnType<SkillJudge['judge']> {
+    try {
+      return await this.skillJudge.judge(request);
+    } catch (err) {
+      throw new SkillJudgeFailure(errorMessage(err));
+    }
+  }
+}
+
+class SkillJudgeFailure extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SkillJudgeFailure';
+  }
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 function buildScenarioBreakdown(

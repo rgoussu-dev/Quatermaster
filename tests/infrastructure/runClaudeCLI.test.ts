@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  buildClaudeArgs,
-  extractJSON,
-} from '../../src/infrastructure/claude-cli/runClaudeCLI.js';
+import { buildClaudeArgs, extractJSON } from '../../src/infrastructure/claude-cli/runClaudeCLI.js';
 
 describe('buildClaudeArgs', () => {
   it('emits -p <prompt> by default', () => {

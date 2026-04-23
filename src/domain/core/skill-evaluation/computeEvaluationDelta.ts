@@ -32,12 +32,8 @@ export function computeEvaluationDelta(
     cases.push(buildCaseDelta(prev, cur));
   }
 
-  const newCases = current.cases
-    .filter((c) => !previousById.has(c.id))
-    .map((c) => c.id);
-  const removedCases = previous.cases
-    .filter((c) => !currentById.has(c.id))
-    .map((c) => c.id);
+  const newCases = current.cases.filter((c) => !previousById.has(c.id)).map((c) => c.id);
+  const removedCases = previous.cases.filter((c) => !currentById.has(c.id)).map((c) => c.id);
 
   return {
     previous: toAggregate(previous),
@@ -58,10 +54,7 @@ function toAggregate(snapshot: EvaluationHistorySnapshot): AggregateView {
   };
 }
 
-function buildCaseDelta(
-  prev: HistoryCaseSnapshot,
-  cur: HistoryCaseSnapshot,
-): CaseDelta {
+function buildCaseDelta(prev: HistoryCaseSnapshot, cur: HistoryCaseSnapshot): CaseDelta {
   return {
     caseId: cur.id,
     previousScore: prev.score,

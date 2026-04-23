@@ -87,7 +87,7 @@ Tests mirror this: `tests/<aggregate>/<Name>.test.ts` with
 
 ## Adding a new metric to the fitness scorer
 
-`FitnessScorer` emits a metric *only when it applies*. Follow the pattern
+`FitnessScorer` emits a metric _only when it applies_. Follow the pattern
 in `scoreArtifacts` / `scoreSimilarity`:
 
 1. Add the metric id to `METRIC_IDS` and a default weight in

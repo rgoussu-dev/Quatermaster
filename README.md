@@ -43,14 +43,18 @@ node bin/quatermaster.js evaluate-skill ./skill.md \
 History lives in `<cwd>/.quatermaster/history/<slug>/<iso>.json`. Opt out
 with `--no-history`; relocate with `--history-dir <path>`.
 
+See `examples/cases.json` for a minimal dataset covering ideal, realistic,
+and adversarial scenarios, including a case with a golden file for
+diff-similarity scoring and per-case `metricWeights` overrides.
+
 ## Scripts
 
-| Script              | What it does                                 |
-| ------------------- | -------------------------------------------- |
+| Script              | What it does                                        |
+| ------------------- | --------------------------------------------------- |
 | `npm run typecheck` | `tsc --noEmit` (strict, exactOptionalPropertyTypes) |
-| `npm test`          | `vitest run`                                 |
-| `npm run build`     | Emit compiled JS to `dist/`                  |
-| `npm run format`    | Prettier over the tree                       |
+| `npm test`          | `vitest run`                                        |
+| `npm run build`     | Emit compiled JS to `dist/`                         |
+| `npm run format`    | Prettier over the tree                              |
 
 ## Architecture
 
@@ -74,6 +78,24 @@ src/
 
 Every port has a `real/` adapter and a `fake/` adapter. Tests use fakes (not
 mocks) wired through `Scenario` + `Factory` helpers in `tests/<aggregate>/`.
+
+## What gets sent to the LLM
+
+`evaluate` ships a snapshot of your project to whichever backend you pick
+(`--judge api` → Anthropic API; `--judge claude-cli` → local `claude` CLI,
+which uses your subscription). The snapshot includes:
+
+- Full `CLAUDE.md` content (with `<untrusted-content>` fencing applied).
+- Up to 2,000 chars of `README.md`.
+- A depth-4, 200-line cap directory tree.
+- Contents of `.claude/settings.json` with best-effort redaction of
+  credential-shaped keys (`token`, `apiKey`, `password`, `Bearer …`, etc.).
+- Paths (and short excerpts) of test files, CI configs, and `.claude/` files.
+
+Use `--no-history` to avoid persisting snapshots, and review the redaction
+in `src/infrastructure/llm-judge/redact.ts` before running against a
+sensitive repo. The workspace adapter (`--workspace`) runs skills with full
+filesystem and network access — it only isolates the cwd to a tmp dir.
 
 ## Scoring model
 

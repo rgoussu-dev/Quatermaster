@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { cp, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -8,6 +7,7 @@ import type {
 } from '../../../domain/contract/ports/AgentRunWorkspace.js';
 import type { AgentRunOutcome } from '../../../domain/contract/AgentRunOutcome.js';
 import type { FileDiff } from '../../../domain/contract/FileDiff.js';
+import { runClaudeCLIFull } from '../../claude-cli/runClaudeCLI.js';
 
 /** Paths skipped when snapshotting or copying a seed repo. */
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.quatermaster']);
@@ -60,11 +60,9 @@ export class FileSystemAgentRunWorkspace implements AgentRunWorkspace {
       const before = await snapshot(workspacePath);
       const prompt = buildPrompt(skillContent, request.userPrompt);
       const started = Date.now();
-      const { stdout, stderr, exitCode } = await spawnClaude(
-        prompt,
-        workspacePath,
-        this.timeoutMs,
-      );
+      const { stdout, stderr, exitCode } = await runClaudeCLIFull(prompt, this.timeoutMs, {
+        cwd: workspacePath,
+      });
       const durationMs = Date.now() - started;
 
       const after = await snapshot(workspacePath);
@@ -97,64 +95,13 @@ USER REQUEST:
 ${userPrompt}`;
 }
 
-interface SpawnResult {
-  readonly stdout: string;
-  readonly stderr: string;
-  readonly exitCode: number;
-}
-
-function spawnClaude(
-  prompt: string,
-  cwd: string,
-  timeoutMs: number,
-): Promise<SpawnResult> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn('claude', ['-p', prompt], {
-      cwd,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' },
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    proc.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-
-    const timer = setTimeout(() => {
-      proc.kill();
-      reject(new Error(`claude CLI timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    proc.on('close', (code) => {
-      clearTimeout(timer);
-      resolve({ stdout, stderr, exitCode: code ?? -1 });
-    });
-
-    proc.on('error', (err) => {
-      clearTimeout(timer);
-      reject(
-        new Error(`Failed to spawn claude CLI: ${err.message}. Is it installed and in PATH?`),
-      );
-    });
-  });
-}
-
 async function snapshot(root: string): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   await walk(root, root, out);
   return out;
 }
 
-async function walk(
-  root: string,
-  dir: string,
-  out: Map<string, string>,
-): Promise<void> {
+async function walk(root: string, dir: string, out: Map<string, string>): Promise<void> {
   const entries = await readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
     if (SKIP_DIRS.has(entry.name)) continue;
@@ -172,10 +119,7 @@ async function walk(
   }
 }
 
-function diff(
-  before: Map<string, string>,
-  after: Map<string, string>,
-): FileDiff[] {
+function diff(before: Map<string, string>, after: Map<string, string>): FileDiff[] {
   const changes: FileDiff[] = [];
   for (const [path, contentAfter] of after) {
     const contentBefore = before.get(path);

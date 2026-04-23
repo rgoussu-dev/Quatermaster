@@ -9,6 +9,10 @@ import { EvaluationError } from './EvaluationError.js';
 import { score as deterministicScore } from './DeterministicScorer.js';
 import { aggregate, overallScore, topRecommendations } from './ScoreAggregator.js';
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 const RUBRIC_CLAUDE_SETUP = `
 Evaluate the Claude Code configuration quality:
 - CLAUDE.md Quality (40 pts): present (+10), describes architecture/conventions clearly (+10), includes testing patterns and workflow (+10), substantive >200 words and project-specific (+10)
@@ -54,37 +58,67 @@ export class EvaluateProjectHandler implements Handler<EvaluateProject> {
   }
 
   async handle(action: EvaluateProject): Promise<Result<EvaluationResult>> {
+    let snapshot;
     try {
-      const snapshot = await this.scanner.scan(action.projectPath);
-      const deterministicAssessments = deterministicScore(snapshot);
+      snapshot = await this.scanner.scan(action.projectPath);
+    } catch (err) {
+      return failure(EvaluationError.scanFailed(errorMessage(err)));
+    }
 
-      const [csJudge, psJudge, tiJudge, docJudge] = await Promise.all([
+    const deterministicAssessments = deterministicScore(snapshot);
+
+    let csJudge, psJudge, tiJudge, docJudge;
+    try {
+      [csJudge, psJudge, tiJudge, docJudge] = await Promise.all([
         this.judge.judge({ snapshot, dimension: 'claude-code-setup', rubric: RUBRIC_CLAUDE_SETUP }),
-        this.judge.judge({ snapshot, dimension: 'project-structure', rubric: RUBRIC_PROJECT_STRUCTURE }),
-        this.judge.judge({ snapshot, dimension: 'test-infrastructure', rubric: RUBRIC_TEST_INFRASTRUCTURE }),
+        this.judge.judge({
+          snapshot,
+          dimension: 'project-structure',
+          rubric: RUBRIC_PROJECT_STRUCTURE,
+        }),
+        this.judge.judge({
+          snapshot,
+          dimension: 'test-infrastructure',
+          rubric: RUBRIC_TEST_INFRASTRUCTURE,
+        }),
         this.judge.judge({ snapshot, dimension: 'documentation', rubric: RUBRIC_DOCUMENTATION }),
       ]);
-
-      const dimensions = aggregate([
-        { dimension: 'claude-code-setup', deterministicAssessment: deterministicAssessments['claude-code-setup'], judgeResponse: csJudge },
-        { dimension: 'project-structure', deterministicAssessment: deterministicAssessments['project-structure'], judgeResponse: psJudge },
-        { dimension: 'test-infrastructure', deterministicAssessment: deterministicAssessments['test-infrastructure'], judgeResponse: tiJudge },
-        { dimension: 'documentation', deterministicAssessment: deterministicAssessments['documentation'], judgeResponse: docJudge },
-      ]);
-
-      const { score, grade } = overallScore(dimensions);
-
-      return success({
-        projectPath: action.projectPath,
-        evaluatedAt: new Date().toISOString(),
-        overallScore: score,
-        overallGrade: grade,
-        dimensions,
-        topRecommendations: topRecommendations(dimensions),
-      });
     } catch (err) {
-      return failure(EvaluationError.scanFailed(err instanceof Error ? err.message : String(err)));
+      return failure(EvaluationError.llmJudgeFailed(errorMessage(err)));
     }
+
+    const dimensions = aggregate([
+      {
+        dimension: 'claude-code-setup',
+        deterministicAssessment: deterministicAssessments['claude-code-setup'],
+        judgeResponse: csJudge,
+      },
+      {
+        dimension: 'project-structure',
+        deterministicAssessment: deterministicAssessments['project-structure'],
+        judgeResponse: psJudge,
+      },
+      {
+        dimension: 'test-infrastructure',
+        deterministicAssessment: deterministicAssessments['test-infrastructure'],
+        judgeResponse: tiJudge,
+      },
+      {
+        dimension: 'documentation',
+        deterministicAssessment: deterministicAssessments['documentation'],
+        judgeResponse: docJudge,
+      },
+    ]);
+
+    const { score, grade } = overallScore(dimensions);
+
+    return success({
+      projectPath: action.projectPath,
+      evaluatedAt: new Date().toISOString(),
+      overallScore: score,
+      overallGrade: grade,
+      dimensions,
+      topRecommendations: topRecommendations(dimensions),
+    });
   }
 }
-

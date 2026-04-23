@@ -21,6 +21,10 @@ import {
   projectHistoryKey,
   skillHistoryKey,
 } from '../../../infrastructure/history-store/real/FileSystemEvaluationHistoryStore.js';
+import {
+  validateProjectSnapshot,
+  validateSkillSnapshot,
+} from '../../../infrastructure/history-store/real/snapshotSchemas.js';
 import { ClaudeCodeSkillJudge } from '../../../infrastructure/skill-judge/claude-cli/ClaudeCodeSkillJudge.js';
 import { AnthropicSkillJudge } from '../../../infrastructure/skill-judge/real/AnthropicSkillJudge.js';
 import type { EvaluationHistorySnapshot } from '../../../domain/contract/EvaluationHistorySnapshot.js';
@@ -54,10 +58,7 @@ program
   )
   .option('--no-history', 'Skip loading and writing the per-run history snapshot.')
   .action(
-    async (
-      targetPath: string,
-      opts: { judge: string; history: boolean; historyDir?: string },
-    ) => {
+    async (targetPath: string, opts: { judge: string; history: boolean; historyDir?: string }) => {
       const judge = buildJudge(opts.judge);
       const projectPath = resolve(targetPath);
       const scanner = new FileSystemScanner();
@@ -67,6 +68,7 @@ program
       const historyStore = opts.history
         ? new FileSystemEvaluationHistoryStore<ProjectHistorySnapshot>(
             opts.historyDir ?? join(process.cwd(), '.quatermaster', 'history'),
+            validateProjectSnapshot,
           )
         : null;
       const key = projectHistoryKey(projectPath);
@@ -141,6 +143,7 @@ program
       const historyStore = opts.history
         ? new FileSystemEvaluationHistoryStore<EvaluationHistorySnapshot>(
             opts.historyDir ?? join(process.cwd(), '.quatermaster', 'history'),
+            validateSkillSnapshot,
           )
         : null;
       const key = skillHistoryKey(resolvedSkillPath, resolvedDatasetPath);
