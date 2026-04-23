@@ -85,7 +85,24 @@ export function printSkillReport(result: SkillEvaluationResult): void {
     const icon = c.passed ? chalk.green('✓') : chalk.red('✗');
     const scoreStr = passColor(`${c.score}/100`);
     const prompt = c.prompt.length > 50 ? c.prompt.slice(0, 47) + '...' : c.prompt;
-    console.log(`  ${icon}  ${scoreStr.padEnd(8)}  ${chalk.dim(c.id.padEnd(16))}  ${prompt}`);
+    const tag = c.scenarioType ? chalk.dim(`[${c.scenarioType}] `) : '';
+    console.log(
+      `  ${icon}  ${scoreStr.padEnd(8)}  ${chalk.dim(c.id.padEnd(16))}  ${tag}${prompt}`,
+    );
+  }
+
+  if (result.scenarioBreakdown) {
+    console.log();
+    console.log(divider);
+    console.log(chalk.bold('SCENARIO BREAKDOWN'));
+    for (const [scenario, bucket] of Object.entries(result.scenarioBreakdown)) {
+      if (!bucket) continue;
+      const pct = bucket.total === 0 ? 0 : Math.round((bucket.passed / bucket.total) * 100);
+      const col = pct >= 80 ? chalk.green : pct >= 60 ? chalk.yellow : chalk.red;
+      console.log(
+        `  ${scenario.padEnd(12)} ${col(`${bucket.passed}/${bucket.total}`)}  ${col(bar(pct))}`,
+      );
+    }
   }
 
   const failed = result.cases.filter((c) => !c.passed);
@@ -96,8 +113,17 @@ export function printSkillReport(result: SkillEvaluationResult): void {
     for (const c of failed) {
       console.log();
       console.log(`  ${chalk.red.bold(c.id)}  ${c.score}/100`);
-      for (const obs of c.observations) {
-        console.log(`    ${chalk.dim('•')} ${obs}`);
+      if (c.metrics) {
+        for (const m of c.metrics) {
+          const weightStr = `(${Math.round(m.weight * 100)}%)`;
+          console.log(
+            `    ${chalk.dim(m.label.padEnd(20))} ${m.score}/100 ${chalk.dim(weightStr)}  ${chalk.dim(m.rationale)}`,
+          );
+        }
+      } else {
+        for (const obs of c.observations) {
+          console.log(`    ${chalk.dim('•')} ${obs}`);
+        }
       }
       console.log(`    ${chalk.dim('Expected:')} ${c.prompt}`);
     }

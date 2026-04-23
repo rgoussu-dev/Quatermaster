@@ -10,6 +10,7 @@ import { FileSystemScanner } from '../../../infrastructure/project-scanner/real/
 import { AnthropicLLMJudge } from '../../../infrastructure/llm-judge/real/AnthropicLLMJudge.js';
 import { ClaudeCodeJudge } from '../../../infrastructure/llm-judge/claude-cli/ClaudeCodeJudge.js';
 import { ClaudeCodeSkillRunner } from '../../../infrastructure/skill-runner/real/ClaudeCodeSkillRunner.js';
+import { FileSystemAgentRunWorkspace } from '../../../infrastructure/agent-workspace/real/FileSystemAgentRunWorkspace.js';
 import { FileSystemDatasetLoader } from '../../../infrastructure/dataset-loader/real/FileSystemDatasetLoader.js';
 import { ClaudeCodeSkillJudge } from '../../../infrastructure/skill-judge/claude-cli/ClaudeCodeSkillJudge.js';
 import { AnthropicSkillJudge } from '../../../infrastructure/skill-judge/real/AnthropicSkillJudge.js';
@@ -56,24 +57,37 @@ program
     'LLM judge backend: "claude-cli" (uses local claude CLI, no API key needed) or "api" (uses ANTHROPIC_API_KEY)',
     'claude-cli',
   )
-  .action(async (skillPath: string, opts: { dataset: string; judge: string }) => {
-    const resolvedSkillPath = resolve(skillPath);
-    const resolvedDatasetPath = resolve(opts.dataset);
-    const skillJudge = buildSkillJudge(opts.judge);
-    const runner = new ClaudeCodeSkillRunner();
-    const loader = new FileSystemDatasetLoader();
-    const handler = new EvaluateSkillHandler(runner, loader, skillJudge);
-    const mediator = new Mediator([handler]);
+  .option(
+    '--workspace',
+    'Run each case in an isolated tmp workspace and score filesystem artifacts in addition to stdout.',
+    false,
+  )
+  .action(
+    async (
+      skillPath: string,
+      opts: { dataset: string; judge: string; workspace: boolean },
+    ) => {
+      const resolvedSkillPath = resolve(skillPath);
+      const resolvedDatasetPath = resolve(opts.dataset);
+      const skillJudge = buildSkillJudge(opts.judge);
+      const runner = new ClaudeCodeSkillRunner();
+      const loader = new FileSystemDatasetLoader();
+      const workspace = opts.workspace ? new FileSystemAgentRunWorkspace() : undefined;
+      const handler = new EvaluateSkillHandler(runner, loader, skillJudge, workspace);
+      const mediator = new Mediator([handler]);
 
-    const result = await mediator.dispatch(new EvaluateSkill(resolvedSkillPath, resolvedDatasetPath));
+      const result = await mediator.dispatch(
+        new EvaluateSkill(resolvedSkillPath, resolvedDatasetPath),
+      );
 
-    if (!result.ok) {
-      printError(result.error);
-      process.exit(1);
-    }
+      if (!result.ok) {
+        printError(result.error);
+        process.exit(1);
+      }
 
-    printSkillReport(result.value);
-  });
+      printSkillReport(result.value);
+    },
+  );
 
 program.parse();
 
