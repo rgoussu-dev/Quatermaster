@@ -15,7 +15,7 @@
  * Example: `fence('actual-output', text)` wraps `text` and rewrites
  * any `</actual-output>` inside it to `<​/actual-output>`.
  */
-const ZERO_WIDTH_SPACE = '​';
+const ZERO_WIDTH_SPACE = '\u200B';
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
