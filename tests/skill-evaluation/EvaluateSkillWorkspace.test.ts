@@ -7,6 +7,9 @@ import {
   workspaceDataset,
   workspaceOutcomes,
   workspaceJudgeResponses,
+  similarityDataset,
+  similarityOutcomes,
+  similarityJudgeResponses,
 } from './EvaluateSkillScenario.js';
 
 describe('EvaluateSkill (workspace + fitness)', () => {
@@ -76,6 +79,55 @@ describe('EvaluateSkill (workspace + fitness)', () => {
     expect(result.value.scenarioBreakdown?.ideal).toEqual({ total: 1, passed: 1 });
     expect(result.value.scenarioBreakdown?.realistic).toEqual({ total: 1, passed: 0 });
     expect(result.value.scenarioBreakdown?.adversarial).toEqual({ total: 1, passed: 1 });
+  });
+
+  describe('diff-similarity metric', () => {
+    it('emits diff-similarity and scores near-matches highly', async () => {
+      const mediator = buildWorkspaceMediator(
+        similarityDataset(),
+        similarityOutcomes(),
+        similarityJudgeResponses(),
+      );
+      const result = await mediator.dispatch(new EvaluateSkill(SKILL_PATH, DATASET_PATH));
+
+      if (!result.ok) throw new Error('Expected success');
+
+      const close = result.value.cases.find((c) => c.id === 'similarity-close');
+      const sim = close?.metrics?.find((m) => m.metricId === 'diff-similarity');
+      expect(sim).toBeDefined();
+      expect(sim?.score).toBeGreaterThanOrEqual(60);
+      expect(sim?.score).toBeLessThan(100);
+    });
+
+    it('penalises wildly-different artifacts even when the judge missed it', async () => {
+      const mediator = buildWorkspaceMediator(
+        similarityDataset(),
+        similarityOutcomes(),
+        similarityJudgeResponses(),
+      );
+      const result = await mediator.dispatch(new EvaluateSkill(SKILL_PATH, DATASET_PATH));
+
+      if (!result.ok) throw new Error('Expected success');
+
+      const far = result.value.cases.find((c) => c.id === 'similarity-far');
+      const sim = far?.metrics?.find((m) => m.metricId === 'diff-similarity');
+      expect(sim?.score).toBe(0);
+    });
+
+    it('does not emit diff-similarity when no artifact declares a golden', async () => {
+      const mediator = buildWorkspaceMediator(
+        workspaceDataset(),
+        workspaceOutcomes(),
+        workspaceJudgeResponses(),
+      );
+      const result = await mediator.dispatch(new EvaluateSkill(SKILL_PATH, DATASET_PATH));
+
+      if (!result.ok) throw new Error('Expected success');
+
+      for (const c of result.value.cases) {
+        expect(c.metrics?.find((m) => m.metricId === 'diff-similarity')).toBeUndefined();
+      }
+    });
   });
 
   it('honours per-case metricWeights overrides', async () => {

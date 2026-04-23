@@ -12,6 +12,15 @@ export interface ExpectedArtifact {
   readonly mustExist?: boolean;
   /** Optional regex source the file's final content must match. */
   readonly contentPattern?: string;
+  /**
+   * Golden content the produced file is compared against by the
+   * `diff-similarity` metric. The metric is only emitted when at least one
+   * expected artifact in the case declares a golden.
+   *
+   * In JSON datasets this is authored as `goldenPath` (a path relative to
+   * the dataset file); the loader resolves it to the content string here.
+   */
+  readonly goldenContent?: string;
 }
 
 /**
