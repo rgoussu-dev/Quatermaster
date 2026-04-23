@@ -101,29 +101,42 @@ export async function runClaudeCLIFull(
       stderr += chunk.toString();
     });
 
-    let timedOut = false;
+    let settled = false;
     let killTimer: NodeJS.Timeout | undefined;
 
+    const settleReject = (err: Error): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutTimer);
+      if (killTimer) clearTimeout(killTimer);
+      reject(err);
+    };
+
+    const settleResolve = (value: ClaudeRunOutcome): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutTimer);
+      if (killTimer) clearTimeout(killTimer);
+      resolve(value);
+    };
+
+    // On timeout we reject immediately so callers don't hang if the
+    // process ignores SIGTERM/SIGKILL. We still try to reap the group,
+    // but the caller's promise no longer waits on it.
     const timeoutTimer = setTimeout(() => {
-      timedOut = true;
       killGroup(proc.pid, 'SIGTERM');
       killTimer = setTimeout(() => killGroup(proc.pid, 'SIGKILL'), KILL_GRACE_MS);
+      settleReject(new Error(`claude CLI timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
     proc.on('close', (code) => {
-      clearTimeout(timeoutTimer);
-      if (killTimer) clearTimeout(killTimer);
-      if (timedOut) {
-        reject(new Error(`claude CLI timed out after ${timeoutMs}ms`));
-        return;
-      }
-      resolve({ stdout, stderr, exitCode: code ?? -1 });
+      settleResolve({ stdout, stderr, exitCode: code ?? -1 });
     });
 
     proc.on('error', (err) => {
-      clearTimeout(timeoutTimer);
-      if (killTimer) clearTimeout(killTimer);
-      reject(new Error(`Failed to spawn claude CLI: ${err.message}. Is it installed and in PATH?`));
+      settleReject(
+        new Error(`Failed to spawn claude CLI: ${err.message}. Is it installed and in PATH?`),
+      );
     });
   });
 }

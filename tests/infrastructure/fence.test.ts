@@ -22,4 +22,13 @@ describe('fence', () => {
     const out = fence('x', hostile);
     expect(out.match(/<\/x>/g)?.length).toBe(1);
   });
+
+  it('neutralises whitespace and case variants of the closing tag', () => {
+    const hostile = ['</x >', '< / x>', '</X>', '</x\t>'].join(' ');
+    const out = fence('x', hostile);
+    // Only the outer closer is the strict </x> form; all hostile
+    // variants should have been rewritten.
+    expect(out.match(/<\/x>/g)?.length).toBe(1);
+    expect(out.match(/<\s*\/\s*x\s*>/gi)?.length).toBe(1);
+  });
 });
