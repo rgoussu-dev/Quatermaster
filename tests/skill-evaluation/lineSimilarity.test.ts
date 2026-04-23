@@ -19,6 +19,11 @@ describe('lineSimilarity', () => {
     expect(lineSimilarity('a\nb\n', 'a\nb')).toBe(100);
   });
 
+  it('treats multiple trailing newlines as equivalent to none', () => {
+    expect(lineSimilarity('a\nb\n\n\n', 'a\nb')).toBe(100);
+    expect(lineSimilarity('a\nb', 'a\nb\n\n')).toBe(100);
+  });
+
   it('normalises CRLF to LF', () => {
     expect(lineSimilarity('a\r\nb\r\n', 'a\nb\n')).toBe(100);
   });

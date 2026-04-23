@@ -118,6 +118,7 @@ export function workspaceOutcomes(): Map<string, AgentRunOutcome> {
         fileChanges: [
           { path: 'COMMIT_MSG', changeType: 'created', contentAfter: 'feat: add login button\n' },
         ],
+        postRunFiles: new Map([['COMMIT_MSG', 'feat: add login button\n']]),
       },
     ],
     [
@@ -129,6 +130,7 @@ export function workspaceOutcomes(): Map<string, AgentRunOutcome> {
         durationMs: 17,
         workspacePath: '/tmp/fake-workspace-missing',
         fileChanges: [],
+        postRunFiles: new Map(),
       },
     ],
     [
@@ -140,6 +142,7 @@ export function workspaceOutcomes(): Map<string, AgentRunOutcome> {
         durationMs: 11,
         workspacePath: '/tmp/fake-workspace-adversarial',
         fileChanges: [],
+        postRunFiles: new Map(),
       },
     ],
   ]);
@@ -201,6 +204,7 @@ export function similarityOutcomes(): Map<string, AgentRunOutcome> {
 - fix: session expiry bug
 `;
 
+  const farContent = 'totally\nunrelated\ncontent\n';
   return new Map<string, AgentRunOutcome>([
     [
       `${SKILL_PATH}::${close.prompt}`,
@@ -211,6 +215,7 @@ export function similarityOutcomes(): Map<string, AgentRunOutcome> {
         durationMs: 12,
         workspacePath: '/tmp/fake-workspace-close',
         fileChanges: [{ path: 'CHANGELOG.md', changeType: 'created', contentAfter: closeContent }],
+        postRunFiles: new Map([['CHANGELOG.md', closeContent]]),
       },
     ],
     [
@@ -222,12 +227,9 @@ export function similarityOutcomes(): Map<string, AgentRunOutcome> {
         durationMs: 14,
         workspacePath: '/tmp/fake-workspace-far',
         fileChanges: [
-          {
-            path: 'CHANGELOG.md',
-            changeType: 'created',
-            contentAfter: 'totally\nunrelated\ncontent\n',
-          },
+          { path: 'CHANGELOG.md', changeType: 'created', contentAfter: farContent },
         ],
+        postRunFiles: new Map([['CHANGELOG.md', farContent]]),
       },
     ],
   ]);

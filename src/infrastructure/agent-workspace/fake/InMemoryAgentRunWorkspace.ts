@@ -18,6 +18,7 @@ export class InMemoryAgentRunWorkspace implements AgentRunWorkspace {
       exitCode: 0,
       durationMs: 0,
       fileChanges: [],
+      postRunFiles: new Map(),
       workspacePath: '/tmp/fake-workspace',
     },
   ) {}

@@ -182,4 +182,46 @@ describe('EvaluateSkill (workspace + fitness)', () => {
     expect(artifactMetric?.score).toBe(0);
     expect(artifactMetric?.rationale).toMatch(/invalid content pattern/);
   });
+
+  it('counts a seeded-but-unchanged file as present via postRunFiles', async () => {
+    // Agent makes no file changes; the file is present only because the
+    // workspace was seeded. The artifact-presence metric must still pass.
+    const dataset = {
+      cases: [
+        {
+          id: 'seeded',
+          prompt: 'Leave the existing README alone.',
+          expectedBehavior: 'README is unchanged.',
+          threshold: 70,
+          expectedArtifacts: [{ path: 'README.md' }],
+        },
+      ],
+    };
+    const outcomes = new Map([
+      [
+        `${SKILL_PATH}::${dataset.cases[0]!.prompt}`,
+        {
+          stdout: 'Nothing to do.',
+          stderr: '',
+          exitCode: 0,
+          durationMs: 5,
+          workspacePath: '/tmp/fake-seeded',
+          fileChanges: [],
+          postRunFiles: new Map([['README.md', '# seeded\n']]),
+        },
+      ],
+    ]);
+    const judgeResponses = new Map([
+      ['seeded', { score: 90, observations: ['left file alone'] }],
+    ]);
+
+    const mediator = buildWorkspaceMediator(dataset, outcomes, judgeResponses);
+    const result = await mediator.dispatch(new EvaluateSkill(SKILL_PATH, DATASET_PATH));
+
+    if (!result.ok) throw new Error('Expected success');
+    const c = result.value.cases[0];
+    const presence = c?.metrics?.find((m) => m.metricId === 'artifact-presence');
+    expect(presence?.score).toBe(100);
+    expect(c?.passed).toBe(true);
+  });
 });

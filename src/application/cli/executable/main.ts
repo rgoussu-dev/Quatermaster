@@ -106,6 +106,11 @@ program
     false,
   )
   .option(
+    '--keep-workspace',
+    'Leave the tmp workspace on disk after each run for post-mortem inspection (debugging only).',
+    false,
+  )
+  .option(
     '--history-dir <path>',
     'Directory for persisted evaluation snapshots. Defaults to <cwd>/.quatermaster/history.',
   )
@@ -117,6 +122,7 @@ program
         dataset: string;
         judge: string;
         workspace: boolean;
+        keepWorkspace: boolean;
         history: boolean;
         historyDir?: string;
       },
@@ -126,7 +132,9 @@ program
       const skillJudge = buildSkillJudge(opts.judge);
       const runner = new ClaudeCodeSkillRunner();
       const loader = new FileSystemDatasetLoader();
-      const workspace = opts.workspace ? new FileSystemAgentRunWorkspace() : undefined;
+      const workspace = opts.workspace
+        ? new FileSystemAgentRunWorkspace({ keepWorkspace: opts.keepWorkspace })
+        : undefined;
       const handler = new EvaluateSkillHandler(runner, loader, skillJudge, workspace);
       const mediator = new Mediator([handler]);
 
