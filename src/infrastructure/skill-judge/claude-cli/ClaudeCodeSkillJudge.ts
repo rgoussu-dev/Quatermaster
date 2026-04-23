@@ -41,7 +41,9 @@ export class ClaudeCodeSkillJudge implements SkillJudge {
   constructor(private readonly timeoutMs = 90_000) {}
 
   async judge(request: SkillJudgeRequest): Promise<SkillJudgeResponse> {
-    const output = await runClaudeCLI(buildPrompt(request), this.timeoutMs);
+    const output = await runClaudeCLI(buildPrompt(request), this.timeoutMs, {
+      noTools: true,
+    });
     const raw = extractJSON(output);
     const parsed = JudgeSchema.parse(raw);
     return { score: parsed.score, observations: parsed.observations };
