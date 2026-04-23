@@ -34,19 +34,21 @@ export class FileSystemEvaluationHistoryStore<T extends { readonly evaluatedAt: 
     }
 
     const snapshots = entries.filter((f) => f.endsWith('.json')).sort();
-    const latest = snapshots[snapshots.length - 1];
-    if (!latest) return null;
-
-    try {
-      const raw = await readFile(join(dir, latest), 'utf-8');
-      const parsed = JSON.parse(raw) as T;
-      if (typeof (parsed as { evaluatedAt?: unknown }).evaluatedAt !== 'string') {
-        return null;
+    for (let i = snapshots.length - 1; i >= 0; i -= 1) {
+      const name = snapshots[i];
+      if (!name) continue;
+      try {
+        const raw = await readFile(join(dir, name), 'utf-8');
+        const parsed = JSON.parse(raw) as T;
+        if (typeof (parsed as { evaluatedAt?: unknown }).evaluatedAt !== 'string') {
+          continue;
+        }
+        return parsed;
+      } catch {
+        continue;
       }
-      return parsed;
-    } catch {
-      return null;
     }
+    return null;
   }
 }
 

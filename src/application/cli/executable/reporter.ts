@@ -119,8 +119,11 @@ export function printSkillReport(result: SkillEvaluationResult): void {
       console.log();
       console.log(`  ${chalk.red.bold(c.id)}  ${c.score}/100`);
       if (c.metrics) {
+        const totalWeight = c.metrics.reduce((sum, m) => sum + m.weight, 0);
         for (const m of c.metrics) {
-          const weightStr = `(${Math.round(m.weight * 100)}%)`;
+          const effectivePct =
+            totalWeight === 0 ? 0 : Math.round((m.weight / totalWeight) * 100);
+          const weightStr = `(${effectivePct}%)`;
           console.log(
             `    ${chalk.dim(m.label.padEnd(20))} ${m.score}/100 ${chalk.dim(weightStr)}  ${chalk.dim(m.rationale)}`,
           );
