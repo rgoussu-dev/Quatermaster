@@ -1,22 +1,25 @@
 import { program } from 'commander';
 import Anthropic from '@anthropic-ai/sdk';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { Mediator } from '../../../domain/contract/kernel/Mediator.js';
 import { EvaluateProject } from '../../../domain/core/evaluation/EvaluateProject.js';
 import { EvaluateProjectHandler } from '../../../domain/core/evaluation/EvaluateProjectHandler.js';
 import { EvaluateSkill } from '../../../domain/core/skill-evaluation/EvaluateSkill.js';
 import { EvaluateSkillHandler } from '../../../domain/core/skill-evaluation/EvaluateSkillHandler.js';
+import { toHistorySnapshot } from '../../../domain/core/skill-evaluation/toHistorySnapshot.js';
+import { computeEvaluationDelta } from '../../../domain/core/skill-evaluation/computeEvaluationDelta.js';
 import { FileSystemScanner } from '../../../infrastructure/project-scanner/real/FileSystemScanner.js';
 import { AnthropicLLMJudge } from '../../../infrastructure/llm-judge/real/AnthropicLLMJudge.js';
 import { ClaudeCodeJudge } from '../../../infrastructure/llm-judge/claude-cli/ClaudeCodeJudge.js';
 import { ClaudeCodeSkillRunner } from '../../../infrastructure/skill-runner/real/ClaudeCodeSkillRunner.js';
 import { FileSystemAgentRunWorkspace } from '../../../infrastructure/agent-workspace/real/FileSystemAgentRunWorkspace.js';
 import { FileSystemDatasetLoader } from '../../../infrastructure/dataset-loader/real/FileSystemDatasetLoader.js';
+import { FileSystemEvaluationHistoryStore } from '../../../infrastructure/history-store/real/FileSystemEvaluationHistoryStore.js';
 import { ClaudeCodeSkillJudge } from '../../../infrastructure/skill-judge/claude-cli/ClaudeCodeSkillJudge.js';
 import { AnthropicSkillJudge } from '../../../infrastructure/skill-judge/real/AnthropicSkillJudge.js';
 import type { LLMJudge } from '../../../domain/contract/ports/LLMJudge.js';
 import type { SkillJudge } from '../../../domain/contract/ports/SkillJudge.js';
-import { printReport, printSkillReport, printError } from './reporter.js';
+import { printReport, printSkillReport, printSkillDelta, printError } from './reporter.js';
 
 program
   .name('quatermaster')
@@ -62,10 +65,21 @@ program
     'Run each case in an isolated tmp workspace and score filesystem artifacts in addition to stdout.',
     false,
   )
+  .option(
+    '--history-dir <path>',
+    'Directory for persisted evaluation snapshots. Defaults to <cwd>/.quatermaster/history.',
+  )
+  .option('--no-history', 'Skip loading and writing the per-run history snapshot.')
   .action(
     async (
       skillPath: string,
-      opts: { dataset: string; judge: string; workspace: boolean },
+      opts: {
+        dataset: string;
+        judge: string;
+        workspace: boolean;
+        history: boolean;
+        historyDir?: string;
+      },
     ) => {
       const resolvedSkillPath = resolve(skillPath);
       const resolvedDatasetPath = resolve(opts.dataset);
@@ -75,6 +89,15 @@ program
       const workspace = opts.workspace ? new FileSystemAgentRunWorkspace() : undefined;
       const handler = new EvaluateSkillHandler(runner, loader, skillJudge, workspace);
       const mediator = new Mediator([handler]);
+
+      const historyStore = opts.history
+        ? new FileSystemEvaluationHistoryStore(
+            opts.historyDir ?? join(process.cwd(), '.quatermaster', 'history'),
+          )
+        : null;
+      const previous = historyStore
+        ? await historyStore.loadLatest(resolvedSkillPath, resolvedDatasetPath)
+        : null;
 
       const result = await mediator.dispatch(
         new EvaluateSkill(resolvedSkillPath, resolvedDatasetPath),
@@ -86,6 +109,14 @@ program
       }
 
       printSkillReport(result.value);
+
+      const current = toHistorySnapshot(result.value);
+      if (previous) {
+        printSkillDelta(computeEvaluationDelta(previous, current));
+      }
+      if (historyStore) {
+        await historyStore.save(current);
+      }
     },
   );
 

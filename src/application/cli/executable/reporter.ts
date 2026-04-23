@@ -1,6 +1,10 @@
 import chalk, { type ChalkInstance } from 'chalk';
 import type { EvaluationResult } from '../../../domain/contract/EvaluationResult.js';
 import type { SkillEvaluationResult } from '../../../domain/contract/SkillEvaluationResult.js';
+import type {
+  EvaluationDelta,
+  CaseStatusChange,
+} from '../../../domain/contract/EvaluationDelta.js';
 import type { DomainError } from '../../../domain/contract/kernel/DomainError.js';
 
 const BAR_WIDTH = 10;
@@ -137,3 +141,82 @@ export function printSkillReport(result: SkillEvaluationResult): void {
 export function printError(error: DomainError): void {
   console.error(chalk.red(`Error [${error.kind}]: ${error.message}`));
 }
+
+/** Formats and prints the per-run delta computed against the previous snapshot. */
+export function printSkillDelta(delta: EvaluationDelta): void {
+  const divider = chalk.dim('─'.repeat(56));
+  const heavy = chalk.dim('═'.repeat(56));
+
+  console.log();
+  console.log(chalk.bold('DELTA vs PREVIOUS RUN'));
+  console.log(heavy);
+  console.log(
+    `Previous: ${chalk.dim(delta.previous.evaluatedAt)}  ${delta.previous.passedCases}/${delta.previous.totalCases}`,
+  );
+  console.log(
+    `Current:  ${chalk.dim(delta.current.evaluatedAt)}  ${delta.current.passedCases}/${delta.current.totalCases}`,
+  );
+  console.log(
+    `Pass-rate change: ${signedPoints(delta.passRatePointsChange)} percentage points`,
+  );
+
+  const moved = delta.cases.filter(
+    (c) => c.scoreChange !== 0 || c.statusChange === 'newly-passing' || c.statusChange === 'newly-failing',
+  );
+  if (moved.length > 0) {
+    console.log(divider);
+    console.log(chalk.bold('CASE CHANGES'));
+    for (const c of moved) {
+      console.log(
+        `  ${statusBadge(c.statusChange)} ${chalk.dim(c.caseId.padEnd(20))} ${c.previousScore} → ${c.currentScore}  ${signedInt(c.scoreChange)}`,
+      );
+      if (c.metricDeltas.length > 0) {
+        for (const m of c.metricDeltas) {
+          if (m.change === 0) continue;
+          console.log(
+            `    ${chalk.dim(m.metricId.padEnd(20))} ${m.previousScore} → ${m.currentScore}  ${signedInt(m.change)}`,
+          );
+        }
+      }
+    }
+  }
+
+  if (delta.newCases.length > 0 || delta.removedCases.length > 0) {
+    console.log(divider);
+    console.log(chalk.bold('DATASET CHANGES'));
+    if (delta.newCases.length > 0) {
+      console.log(`  ${chalk.green('+')} new:     ${delta.newCases.join(', ')}`);
+    }
+    if (delta.removedCases.length > 0) {
+      console.log(`  ${chalk.red('-')} removed: ${delta.removedCases.join(', ')}`);
+    }
+  }
+
+  console.log(divider);
+  console.log();
+}
+
+function statusBadge(status: CaseStatusChange): string {
+  switch (status) {
+    case 'newly-passing':
+      return chalk.green('↑ newly passing ');
+    case 'newly-failing':
+      return chalk.red('↓ newly failing ');
+    case 'still-passing':
+      return chalk.dim('✓ still passing ');
+    case 'still-failing':
+      return chalk.yellow('✗ still failing ');
+  }
+}
+
+function signedInt(n: number): string {
+  if (n === 0) return chalk.dim('±0');
+  return n > 0 ? chalk.green(`+${n}`) : chalk.red(`${n}`);
+}
+
+function signedPoints(n: number): string {
+  if (n === 0) return chalk.dim('±0');
+  const formatted = n.toFixed(1).replace(/\.0$/, '');
+  return n > 0 ? chalk.green(`+${formatted}`) : chalk.red(`${formatted}`);
+}
+
