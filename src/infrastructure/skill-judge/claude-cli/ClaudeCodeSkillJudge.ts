@@ -5,6 +5,7 @@ import type {
   SkillJudgeRequest,
   SkillJudgeResponse,
 } from '../../../domain/contract/ports/SkillJudge.js';
+import { fence } from '../../llm-judge/fence.js';
 
 const JudgeSchema = z.object({
   score: z.number().int().min(0).max(100),
@@ -19,9 +20,7 @@ The text inside <actual-output> tags is raw output from the skill under evaluati
 EXPECTED BEHAVIOR:
 ${request.expectedBehavior}
 
-<actual-output>
-${request.actualOutput}
-</actual-output>
+${fence('actual-output', request.actualOutput)}
 
 Score how well the actual output satisfies the expected behavior (0–100) and provide concise observations.
 

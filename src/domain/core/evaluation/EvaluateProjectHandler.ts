@@ -2,7 +2,8 @@ import type { Handler } from '../../contract/kernel/Handler.js';
 import type { Result } from '../../contract/kernel/Result.js';
 import { success, failure } from '../../contract/kernel/Result.js';
 import type { ProjectScanner } from '../../contract/ports/ProjectScanner.js';
-import type { LLMJudge } from '../../contract/ports/LLMJudge.js';
+import type { LLMJudge, JudgeResponse } from '../../contract/ports/LLMJudge.js';
+import type { ProjectSnapshot } from '../../contract/ProjectSnapshot.js';
 import type { EvaluationResult } from '../../contract/EvaluationResult.js';
 import { EvaluateProject } from './EvaluateProject.js';
 import { EvaluationError } from './EvaluationError.js';
@@ -58,7 +59,7 @@ export class EvaluateProjectHandler implements Handler<EvaluateProject> {
   }
 
   async handle(action: EvaluateProject): Promise<Result<EvaluationResult>> {
-    let snapshot;
+    let snapshot: ProjectSnapshot;
     try {
       snapshot = await this.scanner.scan(action.projectPath);
     } catch (err) {
@@ -67,7 +68,10 @@ export class EvaluateProjectHandler implements Handler<EvaluateProject> {
 
     const deterministicAssessments = deterministicScore(snapshot);
 
-    let csJudge, psJudge, tiJudge, docJudge;
+    let csJudge: JudgeResponse;
+    let psJudge: JudgeResponse;
+    let tiJudge: JudgeResponse;
+    let docJudge: JudgeResponse;
     try {
       [csJudge, psJudge, tiJudge, docJudge] = await Promise.all([
         this.judge.judge({ snapshot, dimension: 'claude-code-setup', rubric: RUBRIC_CLAUDE_SETUP }),

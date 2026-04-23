@@ -38,4 +38,20 @@ describe('withRetry', () => {
     await expect(withRetry(fn, { maxAttempts: 2, sleep: noSleep })).rejects.toThrow('overloaded');
     expect(fn).toHaveBeenCalledTimes(2);
   });
+
+  it('rejects maxAttempts < 1 up front', async () => {
+    const fn = vi.fn(async () => 'ok');
+    await expect(withRetry(fn, { maxAttempts: 0, sleep: noSleep })).rejects.toThrow(
+      /maxAttempts >= 1/,
+    );
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-integer maxAttempts', async () => {
+    const fn = vi.fn(async () => 'ok');
+    await expect(withRetry(fn, { maxAttempts: 1.5, sleep: noSleep })).rejects.toThrow(
+      /maxAttempts >= 1/,
+    );
+    expect(fn).not.toHaveBeenCalled();
+  });
 });

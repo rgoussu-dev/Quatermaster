@@ -2,7 +2,7 @@ import type { Handler } from '../../contract/kernel/Handler.js';
 import type { Result } from '../../contract/kernel/Result.js';
 import { success, failure } from '../../contract/kernel/Result.js';
 import type { SkillRunner } from '../../contract/ports/SkillRunner.js';
-import type { DatasetLoader } from '../../contract/ports/DatasetLoader.js';
+import type { DatasetLoader, SkillDataset } from '../../contract/ports/DatasetLoader.js';
 import type { SkillJudge } from '../../contract/ports/SkillJudge.js';
 import type { AgentRunWorkspace } from '../../contract/ports/AgentRunWorkspace.js';
 import type {
@@ -42,14 +42,14 @@ export class EvaluateSkillHandler implements Handler<EvaluateSkill> {
   }
 
   async handle(action: EvaluateSkill): Promise<Result<SkillEvaluationResult>> {
-    let dataset;
+    let dataset: SkillDataset;
     try {
       dataset = await this.datasetLoader.load(action.datasetPath);
     } catch (err) {
       return failure(SkillEvaluationError.datasetLoadFailed(errorMessage(err)));
     }
 
-    let caseResults;
+    let caseResults: SkillCaseResult[];
     try {
       caseResults = await Promise.all(
         dataset.cases.map((skillCase) => this.evaluateCase(action.skillPath, skillCase)),

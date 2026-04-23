@@ -6,6 +6,7 @@ import type {
   SkillJudgeResponse,
 } from '../../../domain/contract/ports/SkillJudge.js';
 import { withRetry } from '../../llm-judge/retry.js';
+import { fence } from '../../llm-judge/fence.js';
 
 const SYSTEM_PROMPT = `You are evaluating whether a skill's output satisfies described expected behavior.
 
@@ -73,7 +74,7 @@ export class AnthropicSkillJudge implements SkillJudge {
         messages: [
           {
             role: 'user',
-            content: `EXPECTED BEHAVIOR:\n${request.expectedBehavior}\n\n<actual-output>\n${request.actualOutput}\n</actual-output>`,
+            content: `EXPECTED BEHAVIOR:\n${request.expectedBehavior}\n\n${fence('actual-output', request.actualOutput)}`,
           },
         ],
       }),
