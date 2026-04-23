@@ -26,33 +26,54 @@ function scoreClaudeSetup(snapshot: ProjectSnapshot): DimensionAssessment {
   if (snapshot.claudeMd !== null) {
     pts += 30;
   } else {
-    findings.push({ description: 'No CLAUDE.md found at project root.', severity: 'critical', source: 'claude-md-missing' });
+    findings.push({
+      description: 'No CLAUDE.md found at project root.',
+      severity: 'critical',
+      source: 'claude-md-missing',
+    });
   }
 
   if (snapshot.claudeMd !== null && snapshot.claudeMd.length > 200) {
     pts += 20;
   } else if (snapshot.claudeMd !== null) {
-    findings.push({ description: 'CLAUDE.md is very short (<200 chars). Add architecture, conventions, and workflow instructions.', severity: 'warning', source: 'claude-md-thin' });
+    findings.push({
+      description:
+        'CLAUDE.md is very short (<200 chars). Add architecture, conventions, and workflow instructions.',
+      severity: 'warning',
+      source: 'claude-md-thin',
+    });
   }
 
   if (snapshot.claudeSettingsJson !== null) {
     pts += 20;
   } else {
-    findings.push({ description: 'No .claude/settings.json found. Configure tool permissions and hooks.', severity: 'warning', source: 'settings-missing' });
+    findings.push({
+      description: 'No .claude/settings.json found. Configure tool permissions and hooks.',
+      severity: 'warning',
+      source: 'settings-missing',
+    });
   }
 
   const hasHooks = snapshot.claudeSettingsJson?.includes('"hooks"') ?? false;
   if (hasHooks) {
     pts += 20;
   } else {
-    findings.push({ description: 'No hooks configured in .claude/settings.json.', severity: 'warning', source: 'hooks-missing' });
+    findings.push({
+      description: 'No hooks configured in .claude/settings.json.',
+      severity: 'warning',
+      source: 'hooks-missing',
+    });
   }
 
   const hasMcp = snapshot.claudeConfigPaths.some((p) => p.includes('mcp'));
   if (hasMcp) {
     pts += 10;
   } else {
-    findings.push({ description: 'No MCP server configuration found.', severity: 'info', source: 'mcp-missing' });
+    findings.push({
+      description: 'No MCP server configuration found.',
+      severity: 'info',
+      source: 'mcp-missing',
+    });
   }
 
   return { score: pts, findings };
@@ -63,34 +84,54 @@ function scoreProjectStructure(snapshot: ProjectSnapshot): DimensionAssessment {
   let pts = 0;
   const tree = snapshot.directoryTree;
 
-  if (/application[/\\]/.test(tree) || tree.includes('/application')) {
+  if (/application[/\\]/.test(tree)) {
     pts += 25;
   } else {
-    findings.push({ description: 'No application/ directory found. Consider hexagonal architecture.', severity: 'warning', source: 'no-application-layer' });
+    findings.push({
+      description: 'No application/ directory found. Consider hexagonal architecture.',
+      severity: 'warning',
+      source: 'no-application-layer',
+    });
   }
 
-  if (/domain[/\\]/.test(tree) || tree.includes('/domain')) {
+  if (/domain[/\\]/.test(tree)) {
     pts += 25;
   } else {
-    findings.push({ description: 'No domain/ directory found.', severity: 'critical', source: 'no-domain-layer' });
+    findings.push({
+      description: 'No domain/ directory found.',
+      severity: 'critical',
+      source: 'no-domain-layer',
+    });
   }
 
-  if (/infrastructure[/\\]/.test(tree) || tree.includes('/infrastructure')) {
+  if (/infrastructure[/\\]/.test(tree)) {
     pts += 25;
   } else {
-    findings.push({ description: 'No infrastructure/ directory found.', severity: 'warning', source: 'no-infrastructure-layer' });
+    findings.push({
+      description: 'No infrastructure/ directory found.',
+      severity: 'warning',
+      source: 'no-infrastructure-layer',
+    });
   }
 
   if (snapshot.ciConfigPaths.length > 0) {
     pts += 15;
   } else {
-    findings.push({ description: 'No CI configuration found.', severity: 'warning', source: 'no-ci' });
+    findings.push({
+      description: 'No CI configuration found.',
+      severity: 'warning',
+      source: 'no-ci',
+    });
   }
 
   if (snapshot.hasLockfile) {
     pts += 10;
   } else {
-    findings.push({ description: 'No package lockfile found.', severity: 'info', source: 'no-lockfile' });
+    findings.push({
+      description: 'No package lockfile found.',
+      severity: 'info',
+      source: 'no-lockfile',
+    });
   }
 
   return { score: pts, findings };
@@ -103,13 +144,21 @@ function scoreTestInfrastructure(snapshot: ProjectSnapshot): DimensionAssessment
   if (snapshot.testFilePaths.length > 0) {
     pts += 20;
   } else {
-    findings.push({ description: 'No test files found.', severity: 'critical', source: 'no-tests' });
+    findings.push({
+      description: 'No test files found.',
+      severity: 'critical',
+      source: 'no-tests',
+    });
   }
 
   if (snapshot.testFilePaths.length >= 5) {
     pts += 20;
   } else if (snapshot.testFilePaths.length > 0) {
-    findings.push({ description: `Only ${snapshot.testFilePaths.length} test file(s) found. Aim for broader coverage.`, severity: 'warning', source: 'few-tests' });
+    findings.push({
+      description: `Only ${snapshot.testFilePaths.length} test file(s) found. Aim for broader coverage.`,
+      severity: 'warning',
+      source: 'few-tests',
+    });
   }
 
   const hasTestConfig = snapshot.sourceFilePaths.some((p) =>
@@ -118,14 +167,22 @@ function scoreTestInfrastructure(snapshot: ProjectSnapshot): DimensionAssessment
   if (hasTestConfig) {
     pts += 20;
   } else {
-    findings.push({ description: 'No test framework configuration file found.', severity: 'warning', source: 'no-test-config' });
+    findings.push({
+      description: 'No test framework configuration file found.',
+      severity: 'warning',
+      source: 'no-test-config',
+    });
   }
 
   const hasScenario = snapshot.testFilePaths.some((p) => /[Ss]cenario/.test(p));
   if (hasScenario) {
     pts += 20;
   } else {
-    findings.push({ description: 'No Scenario pattern found in test files. Add test data builders.', severity: 'info', source: 'no-scenario-pattern' });
+    findings.push({
+      description: 'No Scenario pattern found in test files. Add test data builders.',
+      severity: 'info',
+      source: 'no-scenario-pattern',
+    });
   }
 
   const hasFake =
@@ -134,7 +191,11 @@ function scoreTestInfrastructure(snapshot: ProjectSnapshot): DimensionAssessment
   if (hasFake) {
     pts += 20;
   } else {
-    findings.push({ description: 'No Fake implementations found. Add fakes for secondary ports.', severity: 'info', source: 'no-fakes' });
+    findings.push({
+      description: 'No Fake implementations found. Add fakes for secondary ports.',
+      severity: 'info',
+      source: 'no-fakes',
+    });
   }
 
   return { score: pts, findings };
@@ -147,31 +208,50 @@ function scoreDocumentation(snapshot: ProjectSnapshot): DimensionAssessment {
   if (snapshot.readmeMd !== null) {
     pts += 25;
   } else {
-    findings.push({ description: 'No README.md found.', severity: 'critical', source: 'no-readme' });
+    findings.push({
+      description: 'No README.md found.',
+      severity: 'critical',
+      source: 'no-readme',
+    });
   }
 
   if (snapshot.readmeMd !== null && snapshot.readmeMd.length > 300) {
     pts += 20;
   } else if (snapshot.readmeMd !== null) {
-    findings.push({ description: 'README.md is too short. Add build instructions and architecture overview.', severity: 'warning', source: 'thin-readme' });
+    findings.push({
+      description: 'README.md is too short. Add build instructions and architecture overview.',
+      severity: 'warning',
+      source: 'thin-readme',
+    });
   }
 
   if (snapshot.claudeMd !== null) {
     pts += 20;
   }
 
-  const hasDocsDir = /\bdocs[/\\]/.test(snapshot.directoryTree) || /\badr[/\\]/.test(snapshot.directoryTree);
+  const hasDocsDir =
+    /\bdocs[/\\]/.test(snapshot.directoryTree) || /\badr[/\\]/.test(snapshot.directoryTree);
   if (hasDocsDir) {
     pts += 20;
   } else {
-    findings.push({ description: 'No docs/ or adr/ directory found.', severity: 'info', source: 'no-docs-dir' });
+    findings.push({
+      description: 'No docs/ or adr/ directory found.',
+      severity: 'info',
+      source: 'no-docs-dir',
+    });
   }
 
-  const hasDockComments = snapshot.testFileSamples.some((s) => s.content.includes('/**') || s.content.includes('///'));
-  if (hasDockComments) {
+  const hasDocComments = snapshot.testFileSamples.some(
+    (s) => s.content.includes('/**') || s.content.includes('///'),
+  );
+  if (hasDocComments) {
     pts += 15;
   } else {
-    findings.push({ description: 'No doc comments (/** */ or ///) found in sampled files.', severity: 'warning', source: 'no-doc-comments' });
+    findings.push({
+      description: 'No doc comments (/** */ or ///) found in sampled files.',
+      severity: 'warning',
+      source: 'no-doc-comments',
+    });
   }
 
   return { score: Math.min(pts, 100), findings };

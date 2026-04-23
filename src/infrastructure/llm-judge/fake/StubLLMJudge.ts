@@ -1,4 +1,8 @@
-import type { LLMJudge, JudgeRequest, JudgeResponse } from '../../../domain/contract/ports/LLMJudge.js';
+import type {
+  LLMJudge,
+  JudgeRequest,
+  JudgeResponse,
+} from '../../../domain/contract/ports/LLMJudge.js';
 import type { DimensionId } from '../../../domain/contract/DimensionScore.js';
 
 /**

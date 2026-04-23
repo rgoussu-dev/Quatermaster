@@ -85,9 +85,7 @@ describe('computeEvaluationDelta', () => {
     ]);
 
     const delta = computeEvaluationDelta(prev, cur);
-    const metricsById = new Map(
-      delta.cases[0]?.metricDeltas.map((m) => [m.metricId, m]) ?? [],
-    );
+    const metricsById = new Map(delta.cases[0]?.metricDeltas.map((m) => [m.metricId, m]) ?? []);
 
     expect(metricsById.get('artifact-presence')?.change).toBe(60);
     expect(metricsById.get('llm-judge')?.change).toBe(0);
@@ -151,9 +149,7 @@ describe('toHistorySnapshot', () => {
               rationale: 'all files present',
             },
           ],
-          fileChanges: [
-            { path: 'x.txt', changeType: 'created', contentAfter: 'hello' },
-          ],
+          fileChanges: [{ path: 'x.txt', changeType: 'created', contentAfter: 'hello' }],
         },
       ],
     };
@@ -163,9 +159,7 @@ describe('toHistorySnapshot', () => {
     expect(snap.cases[0]?.id).toBe('a');
     expect(snap.cases[0]?.score).toBe(90);
     expect(snap.cases[0]?.scenarioType).toBe('ideal');
-    expect(snap.cases[0]?.metrics).toEqual([
-      { metricId: 'artifact-presence', score: 100 },
-    ]);
+    expect(snap.cases[0]?.metrics).toEqual([{ metricId: 'artifact-presence', score: 100 }]);
     // Verbose fields must not leak.
     expect((snap.cases[0] as unknown as { actualOutput?: unknown }).actualOutput).toBeUndefined();
     expect((snap.cases[0] as unknown as { fileChanges?: unknown }).fileChanges).toBeUndefined();

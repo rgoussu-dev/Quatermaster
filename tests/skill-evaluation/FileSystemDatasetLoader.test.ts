@@ -29,9 +29,7 @@ describe('FileSystemDatasetLoader goldenPath resolution', () => {
             prompt: 'do it',
             expectedBehavior: 'CHANGELOG.md matches',
             threshold: 70,
-            expectedArtifacts: [
-              { path: 'CHANGELOG.md', goldenPath: 'golden/CHANGELOG.md' },
-            ],
+            expectedArtifacts: [{ path: 'CHANGELOG.md', goldenPath: 'golden/CHANGELOG.md' }],
           },
         ],
       }),
@@ -56,9 +54,7 @@ describe('FileSystemDatasetLoader goldenPath resolution', () => {
             prompt: 'do it',
             expectedBehavior: 'anything',
             threshold: 70,
-            expectedArtifacts: [
-              { path: 'X.txt', goldenContent: 'inlined\n' },
-            ],
+            expectedArtifacts: [{ path: 'X.txt', goldenContent: 'inlined\n' }],
           },
         ],
       }),
@@ -81,9 +77,7 @@ describe('FileSystemDatasetLoader goldenPath resolution', () => {
             prompt: 'do it',
             expectedBehavior: 'anything',
             threshold: 70,
-            expectedArtifacts: [
-              { path: 'X.txt', goldenPath: 'does-not-exist.txt' },
-            ],
+            expectedArtifacts: [{ path: 'X.txt', goldenPath: 'does-not-exist.txt' }],
           },
         ],
       }),

@@ -45,10 +45,7 @@ export class FitnessScorer {
     return { overallScore: aggregate(metrics), metrics };
   }
 
-  private weighted(
-    skillCase: SkillCase,
-    raw: Omit<MetricScore, 'weight'>,
-  ): MetricScore {
+  private weighted(skillCase: SkillCase, raw: Omit<MetricScore, 'weight'>): MetricScore {
     const override = skillCase.metricWeights?.[raw.metricId];
     const defaultWeight = DEFAULT_METRIC_WEIGHTS[raw.metricId] ?? 0;
     const weight = override ?? defaultWeight;
@@ -78,6 +75,11 @@ export class FitnessScorer {
         continue;
       }
       if (artifact.contentPattern && content !== undefined) {
+        const unsafe = unsafePatternReason(artifact.contentPattern);
+        if (unsafe) {
+          misses.push(`invalid content pattern ${artifact.path}: ${unsafe}`);
+          continue;
+        }
         let re: RegExp;
         try {
           re = new RegExp(artifact.contentPattern);
@@ -113,23 +115,23 @@ export class FitnessScorer {
     outcome: AgentRunOutcome,
   ): Omit<MetricScore, 'weight'> | null {
     if (!expected) return null;
-    const withGolden = expected.filter((a) => a.goldenContent !== undefined);
+    const withGolden = expected.filter(
+      (a): a is ExpectedArtifact & { goldenContent: string } => a.goldenContent !== undefined,
+    );
     if (withGolden.length === 0) return null;
 
     const perArtifact: { path: string; similarity: number }[] = [];
     for (const artifact of withGolden) {
       const produced = outcome.postRunFiles.get(artifact.path);
       const similarity =
-        produced === undefined ? 0 : lineSimilarity(produced, artifact.goldenContent!);
+        produced === undefined ? 0 : lineSimilarity(produced, artifact.goldenContent);
       perArtifact.push({ path: artifact.path, similarity });
     }
 
     const avg = Math.round(
       perArtifact.reduce((sum, r) => sum + r.similarity, 0) / perArtifact.length,
     );
-    const rationale = perArtifact
-      .map((r) => `${r.path}: ${r.similarity}%`)
-      .join(', ');
+    const rationale = perArtifact.map((r) => `${r.path}: ${r.similarity}%`).join(', ');
 
     return {
       metricId: METRIC_IDS.diffSimilarity,
@@ -149,9 +151,7 @@ export class FitnessScorer {
     };
   }
 
-  private scoreJudge(
-    judgement: SkillJudgeResponse,
-  ): Omit<MetricScore, 'weight'> {
+  private scoreJudge(judgement: SkillJudgeResponse): Omit<MetricScore, 'weight'> {
     return {
       metricId: METRIC_IDS.llmJudge,
       label: 'LLM judge',
@@ -162,6 +162,23 @@ export class FitnessScorer {
           : judgement.observations.join('; '),
     };
   }
+}
+
+const MAX_PATTERN_LENGTH = 512;
+
+// Nested quantifier on a group (a catastrophic-backtracking smell — e.g.
+// (a+)+, (.*)+, (\d+)*). Checked as a string before the RegExp is compiled
+// so a hostile dataset can't lock the scorer on `re.test(content)`.
+const NESTED_QUANTIFIER = /\([^)]*[+*][^)]*\)[+*]/;
+
+function unsafePatternReason(pattern: string): string | null {
+  if (pattern.length > MAX_PATTERN_LENGTH) {
+    return `pattern longer than ${MAX_PATTERN_LENGTH} chars`;
+  }
+  if (NESTED_QUANTIFIER.test(pattern)) {
+    return 'nested quantifier rejected to avoid catastrophic backtracking';
+  }
+  return null;
 }
 
 function aggregate(metrics: readonly MetricScore[]): number {

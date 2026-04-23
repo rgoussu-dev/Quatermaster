@@ -34,7 +34,10 @@ export class Mediator {
     const ctor = action.constructor;
     const handler = this.registry.get(ctor);
     if (!handler) {
-      return failure({ kind: 'no-handler', message: `No handler registered for ${ctor.name}` }) as Result<R>;
+      return failure({
+        kind: 'no-handler',
+        message: `No handler registered for ${ctor.name}`,
+      }) as Result<R>;
     }
     return handler.handle(action as Action<unknown>) as Promise<Result<R>>;
   }

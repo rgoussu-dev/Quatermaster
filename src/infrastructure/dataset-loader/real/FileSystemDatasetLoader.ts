@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import type { DatasetLoader, SkillDataset } from '../../../domain/contract/ports/DatasetLoader.js';
 import type { SkillCase, ExpectedArtifact } from '../../../domain/contract/SkillCase.js';
@@ -11,9 +11,11 @@ const ExpectedArtifactSchema = z.object({
   mustExist: z.boolean().optional(),
   contentPattern: z.string().optional(),
   /**
-   * Path to a golden file resolved relative to the dataset JSON (or
-   * absolute). The loader reads it and inlines the content as
-   * `goldenContent` on the runtime DTO.
+   * Path to a golden file, always resolved relative to the dataset JSON.
+   * Paths that escape the dataset directory (`..`, absolute paths) are
+   * rejected at load time to prevent unintended filesystem reads.
+   * The loader reads the file and inlines the content as `goldenContent`
+   * on the runtime DTO.
    */
   goldenPath: z.string().optional(),
   /** Allow authors to inline golden content directly instead of a path. */
@@ -56,15 +58,11 @@ export class FileSystemDatasetLoader implements DatasetLoader {
 
     const result = SkillDatasetSchema.safeParse(parsed);
     if (!result.success) {
-      throw new Error(
-        `Dataset at "${datasetPath}" failed validation: ${result.error.message}`,
-      );
+      throw new Error(`Dataset at "${datasetPath}" failed validation: ${result.error.message}`);
     }
 
     const datasetDir = dirname(datasetPath);
-    const cases = await Promise.all(
-      result.data.cases.map((c) => normalizeCase(c, datasetDir)),
-    );
+    const cases = await Promise.all(result.data.cases.map((c) => normalizeCase(c, datasetDir)));
     return { cases };
   }
 }
@@ -119,9 +117,13 @@ async function resolveGoldenContent(
   if (parsed.goldenContent !== undefined) return parsed.goldenContent;
   if (parsed.goldenPath === undefined) return undefined;
 
-  const absolute = isAbsolute(parsed.goldenPath)
-    ? parsed.goldenPath
-    : resolve(datasetDir, parsed.goldenPath);
+  const absolute = resolve(datasetDir, parsed.goldenPath);
+  const rel = relative(resolve(datasetDir), absolute);
+  if (rel === '' || rel.startsWith('..')) {
+    throw new Error(
+      `goldenPath "${parsed.goldenPath}" for artifact "${parsed.path}" escapes the dataset directory`,
+    );
+  }
   try {
     return await readFile(absolute, 'utf-8');
   } catch (err) {

@@ -3,6 +3,13 @@ import { basename, extname, join } from 'node:path';
 import type { EvaluationHistoryStore } from '../../../domain/contract/ports/EvaluationHistoryStore.js';
 
 /**
+ * Validates a raw JSON value and either returns the typed snapshot or
+ * `null` to signal "skip this file" so schema drift on disk never blocks a
+ * fresh run. Callers pass a Zod-backed validator in the CLI.
+ */
+export type SnapshotValidator<T> = (raw: unknown) => T | null;
+
+/**
  * Real adapter — writes snapshots as JSON under `<rootDir>/<slug>/<iso>.json`.
  * Generic over snapshot type so the same implementation serves skill-eval
  * and project-eval history. The slug is derived by the caller via the
@@ -12,10 +19,13 @@ import type { EvaluationHistoryStore } from '../../../domain/contract/ports/Eval
  * Malformed or unreadable history files are ignored rather than crashing
  * the evaluation — a stale history directory should never block a fresh run.
  */
-export class FileSystemEvaluationHistoryStore<T extends { readonly evaluatedAt: string }>
-  implements EvaluationHistoryStore<T>
-{
-  constructor(private readonly rootDir: string) {}
+export class FileSystemEvaluationHistoryStore<
+  T extends { readonly evaluatedAt: string },
+> implements EvaluationHistoryStore<T> {
+  constructor(
+    private readonly rootDir: string,
+    private readonly validate: SnapshotValidator<T> = defaultValidator,
+  ) {}
 
   async save(key: string, snapshot: T): Promise<void> {
     const dir = join(this.rootDir, sanitize(key));
@@ -39,17 +49,21 @@ export class FileSystemEvaluationHistoryStore<T extends { readonly evaluatedAt: 
       if (!name) continue;
       try {
         const raw = await readFile(join(dir, name), 'utf-8');
-        const parsed = JSON.parse(raw) as T;
-        if (typeof (parsed as { evaluatedAt?: unknown }).evaluatedAt !== 'string') {
-          continue;
-        }
-        return parsed;
+        const parsed: unknown = JSON.parse(raw);
+        const validated = this.validate(parsed);
+        if (validated !== null) return validated;
       } catch {
         continue;
       }
     }
     return null;
   }
+}
+
+function defaultValidator<T extends { readonly evaluatedAt: string }>(raw: unknown): T | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  if (typeof (raw as { evaluatedAt?: unknown }).evaluatedAt !== 'string') return null;
+  return raw as T;
 }
 
 /** Key for a skill-eval history entry. */
@@ -70,7 +84,11 @@ function sanitize(s: string): string {
   return s.replace(/[^a-zA-Z0-9_-]/g, '-');
 }
 
-/** Small deterministic suffix so two projects with the same basename don't collide. */
+/**
+ * Small deterministic suffix so two projects with the same basename don't
+ * collide in the history directory. Non-cryptographic (djb2-like mix with
+ * XOR); used only to disambiguate sibling slugs.
+ */
 function shortHash(s: string): string {
   let h = 5381;
   for (let i = 0; i < s.length; i += 1) {

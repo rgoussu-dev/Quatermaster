@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { EvaluateSkill } from '../../src/domain/core/skill-evaluation/EvaluateSkill.js';
-import { passingDataset, mixedDataset, passingJudgeResponses, mixedJudgeResponses } from './EvaluateSkillScenario.js';
+import {
+  passingDataset,
+  mixedDataset,
+  passingJudgeResponses,
+  mixedJudgeResponses,
+} from './EvaluateSkillScenario.js';
 import { buildMediator } from './EvaluateSkillFactory.js';
 import { SKILL_PATH, DATASET_PATH } from './EvaluateSkillScenario.js';
 
@@ -67,7 +72,9 @@ describe('EvaluateSkill', () => {
   describe('missing dataset', () => {
     it('returns failure when the dataset path does not exist', async () => {
       const mediator = buildMediator(passingDataset());
-      const result = await mediator.dispatch(new EvaluateSkill(SKILL_PATH, '/nonexistent/dataset.json'));
+      const result = await mediator.dispatch(
+        new EvaluateSkill(SKILL_PATH, '/nonexistent/dataset.json'),
+      );
 
       expect(result.ok).toBe(false);
     });

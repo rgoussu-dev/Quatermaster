@@ -38,7 +38,10 @@ function makeCase(id: string, prompt: string, threshold: number): SkillCase {
 /** Preset judge responses keyed by case id. */
 export function passingJudgeResponses(): Map<string, SkillJudgeResponse> {
   return new Map([
-    ['stage-and-commit', { score: 85, observations: ['Correctly staged files', 'Valid conventional commit message'] }],
+    [
+      'stage-and-commit',
+      { score: 85, observations: ['Correctly staged files', 'Valid conventional commit message'] },
+    ],
     ['commit-message', { score: 90, observations: ['Clear feat prefix', 'Descriptive body'] }],
   ]);
 }
@@ -47,7 +50,10 @@ export function passingJudgeResponses(): Map<string, SkillJudgeResponse> {
 export function mixedJudgeResponses(): Map<string, SkillJudgeResponse> {
   return new Map([
     ['good-case', { score: 80, observations: ['Good commit structure'] }],
-    ['bad-case', { score: 20, observations: ['Skill should not commit secrets', 'Missing safety check'] }],
+    [
+      'bad-case',
+      { score: 20, observations: ['Skill should not commit secrets', 'Missing safety check'] },
+    ],
   ]);
 }
 
@@ -75,9 +81,7 @@ export function workspaceDataset(): SkillDataset {
         expectedBehavior: 'File COMMIT_MSG exists and contains a feat: prefix.',
         threshold: 70,
         scenarioType: 'ideal',
-        expectedArtifacts: [
-          { path: 'COMMIT_MSG', contentPattern: '^feat:' },
-        ],
+        expectedArtifacts: [{ path: 'COMMIT_MSG', contentPattern: '^feat:' }],
       },
       {
         id: 'artifact-missing',
@@ -226,9 +230,7 @@ export function similarityOutcomes(): Map<string, AgentRunOutcome> {
         exitCode: 0,
         durationMs: 14,
         workspacePath: '/tmp/fake-workspace-far',
-        fileChanges: [
-          { path: 'CHANGELOG.md', changeType: 'created', contentAfter: farContent },
-        ],
+        fileChanges: [{ path: 'CHANGELOG.md', changeType: 'created', contentAfter: farContent }],
         postRunFiles: new Map([['CHANGELOG.md', farContent]]),
       },
     ],

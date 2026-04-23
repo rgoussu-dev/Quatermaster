@@ -21,6 +21,24 @@ export interface RunClaudeOptions {
 }
 
 /**
+ * Outcome of a `claude` subprocess call. The `full` variant returns stdout,
+ * stderr, and the exit code so callers (e.g. the workspace adapter) can
+ * preserve them in their own outcome types. Code is `-1` when the process
+ * was killed before emitting an exit status.
+ */
+export interface ClaudeRunOutcome {
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly exitCode: number;
+}
+
+/** Grace period between SIGTERM and SIGKILL when killing a hung subprocess. */
+const KILL_GRACE_MS = 2_000;
+
+/** Env vars we never want to forward to the `claude` CLI subprocess. */
+const STRIPPED_ENV_KEYS = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'];
+
+/**
  * Builds the argv for the `claude` CLI. Pure — split from the spawn call so
  * it can be unit-tested without touching the child_process APIs.
  */
@@ -44,47 +62,105 @@ export async function runClaudeCLI(
   timeoutMs: number,
   opts: RunClaudeOptions = {},
 ): Promise<string> {
+  const { stdout, stderr, exitCode } = await runClaudeCLIFull(prompt, timeoutMs, opts);
+  if (exitCode !== 0) {
+    throw new Error(`claude CLI exited ${exitCode}: ${stderr.slice(0, 300)}`);
+  }
+  return stdout;
+}
+
+/**
+ * Lower-level variant of {@link runClaudeCLI} that resolves with the full
+ * outcome (stdout, stderr, exit code) instead of rejecting on non-zero
+ * exits. Used by callers — like the workspace adapter — that want to
+ * preserve the failure context.
+ *
+ * Still rejects on spawn errors and timeouts (timeouts SIGTERM the process
+ * group, then SIGKILL after a short grace period).
+ */
+export async function runClaudeCLIFull(
+  prompt: string,
+  timeoutMs: number,
+  opts: RunClaudeOptions = {},
+): Promise<ClaudeRunOutcome> {
   return new Promise((resolve, reject) => {
     const proc = spawn('claude', buildClaudeArgs(prompt, opts), {
       cwd: opts.cwd ?? tmpdir(),
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' },
+      env: buildChildEnv(),
+      detached: true,
     });
 
     let stdout = '';
     let stderr = '';
 
-    proc.stdout.on('data', (chunk: Buffer) => {
+    proc.stdout?.on('data', (chunk: Buffer) => {
       stdout += chunk.toString();
     });
-    proc.stderr.on('data', (chunk: Buffer) => {
+    proc.stderr?.on('data', (chunk: Buffer) => {
       stderr += chunk.toString();
     });
 
-    const timer = setTimeout(() => {
-      proc.kill();
-      reject(new Error(`claude CLI timed out after ${timeoutMs}ms`));
+    let timedOut = false;
+    let killTimer: NodeJS.Timeout | undefined;
+
+    const timeoutTimer = setTimeout(() => {
+      timedOut = true;
+      killGroup(proc.pid, 'SIGTERM');
+      killTimer = setTimeout(() => killGroup(proc.pid, 'SIGKILL'), KILL_GRACE_MS);
     }, timeoutMs);
 
     proc.on('close', (code) => {
-      clearTimeout(timer);
-      if (code !== 0) {
-        reject(new Error(`claude CLI exited ${code}: ${stderr.slice(0, 300)}`));
-      } else {
-        resolve(stdout);
+      clearTimeout(timeoutTimer);
+      if (killTimer) clearTimeout(killTimer);
+      if (timedOut) {
+        reject(new Error(`claude CLI timed out after ${timeoutMs}ms`));
+        return;
       }
+      resolve({ stdout, stderr, exitCode: code ?? -1 });
     });
 
     proc.on('error', (err) => {
-      clearTimeout(timer);
-      reject(
-        new Error(`Failed to spawn claude CLI: ${err.message}. Is it installed and in PATH?`),
-      );
+      clearTimeout(timeoutTimer);
+      if (killTimer) clearTimeout(killTimer);
+      reject(new Error(`Failed to spawn claude CLI: ${err.message}. Is it installed and in PATH?`));
     });
   });
 }
 
-/** Extracts the first JSON object or ```json``` fenced block from `output`. */
+function buildChildEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of STRIPPED_ENV_KEYS) {
+    delete env[key];
+  }
+  env['NO_COLOR'] = '1';
+  env['FORCE_COLOR'] = '0';
+  return env;
+}
+
+function killGroup(pid: number | undefined, signal: NodeJS.Signals): void {
+  if (pid === undefined) return;
+  try {
+    // Negative pid targets the whole process group so children the CLI may
+    // have forked are also reaped.
+    process.kill(-pid, signal);
+  } catch {
+    try {
+      process.kill(pid, signal);
+    } catch {
+      // Process already exited — nothing to do.
+    }
+  }
+}
+
+/**
+ * Extracts the first JSON object or ```json``` fenced block from `output`.
+ *
+ * Heuristic — picks the first fenced block, otherwise the substring from
+ * the first `{` to the last `}`. Prose that contains a stray `{` before the
+ * real JSON can cause a parse error; callers wrap the result with Zod and
+ * treat that as an adapter-level failure.
+ */
 export function extractJSON(output: string): unknown {
   const fenceMatch = output.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   if (fenceMatch?.[1]) {

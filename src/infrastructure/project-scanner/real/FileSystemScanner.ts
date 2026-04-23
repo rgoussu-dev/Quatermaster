@@ -5,13 +5,28 @@ import type { ProjectScanner } from '../../../domain/contract/ports/ProjectScann
 import type { ProjectSnapshot } from '../../../domain/contract/ProjectSnapshot.js';
 
 const IGNORED = new Set([
-  'node_modules', '.git', 'dist', 'build', 'out', '.next', '.nuxt',
-  'target', '__pycache__', '.mypy_cache', '.pytest_cache', 'coverage',
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'out',
+  '.next',
+  '.nuxt',
+  'target',
+  '__pycache__',
+  '.mypy_cache',
+  '.pytest_cache',
+  'coverage',
 ]);
 
 const LOCKFILES = [
-  'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
-  'Cargo.lock', 'poetry.lock', 'go.sum', 'Gemfile.lock',
+  'package-lock.json',
+  'yarn.lock',
+  'pnpm-lock.yaml',
+  'Cargo.lock',
+  'poetry.lock',
+  'go.sum',
+  'Gemfile.lock',
 ];
 
 const CI_PATTERNS = [
@@ -25,8 +40,14 @@ const CI_PATTERNS = [
 ];
 
 const TEST_GLOBS = [
-  '**/*.test.ts', '**/*.test.js', '**/*.spec.ts', '**/*.spec.js',
-  '**/test_*.py', '**/*_test.py', '**/Test*.java', '**/*Test.java',
+  '**/*.test.ts',
+  '**/*.test.js',
+  '**/*.spec.ts',
+  '**/*.spec.js',
+  '**/test_*.py',
+  '**/*_test.py',
+  '**/Test*.java',
+  '**/*Test.java',
 ];
 
 const SOURCE_GLOBS = ['src/**/*.ts', 'src/**/*.js', 'lib/**/*.ts', 'lib/**/*.js'];
@@ -108,7 +129,13 @@ export class FileSystemScanner implements ProjectScanner {
       .map((p) => p.replace(/\\/g, '/'));
 
     const hasLockfile = (
-      await Promise.all(LOCKFILES.map((f) => access(join(projectPath, f)).then(() => true).catch(() => false)))
+      await Promise.all(
+        LOCKFILES.map((f) =>
+          access(join(projectPath, f))
+            .then(() => true)
+            .catch(() => false),
+        ),
+      )
     ).some(Boolean);
 
     const ciConfigPaths = await collectCIConfigs(projectPath);

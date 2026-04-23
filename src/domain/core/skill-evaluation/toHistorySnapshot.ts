@@ -1,4 +1,7 @@
-import type { SkillEvaluationResult, SkillCaseResult } from '../../contract/SkillEvaluationResult.js';
+import type {
+  SkillEvaluationResult,
+  SkillCaseResult,
+} from '../../contract/SkillEvaluationResult.js';
 import type {
   EvaluationHistorySnapshot,
   HistoryCaseSnapshot,
@@ -19,9 +22,7 @@ export function toHistorySnapshot(result: SkillEvaluationResult): EvaluationHist
     passedCases: result.passedCases,
     cases: result.cases.map(toCaseSnapshot),
   };
-  return result.scenarioBreakdown
-    ? { ...base, scenarioBreakdown: result.scenarioBreakdown }
-    : base;
+  return result.scenarioBreakdown ? { ...base, scenarioBreakdown: result.scenarioBreakdown } : base;
 }
 
 function toCaseSnapshot(c: SkillCaseResult): HistoryCaseSnapshot {

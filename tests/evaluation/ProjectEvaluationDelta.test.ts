@@ -88,7 +88,9 @@ describe('toProjectHistorySnapshot', () => {
           weight: 0.35,
           score: 1,
           grade: 'F',
-          findings: [{ description: 'Missing CLAUDE.md', severity: 'critical', source: 'deterministic' }],
+          findings: [
+            { description: 'Missing CLAUDE.md', severity: 'critical', source: 'deterministic' },
+          ],
         },
       ],
       topRecommendations: ['Add CLAUDE.md'],
@@ -97,9 +99,7 @@ describe('toProjectHistorySnapshot', () => {
     const snapshot = toProjectHistorySnapshot(result);
     expect(snapshot.dimensions[0]?.id).toBe('claude-code-setup');
     expect(snapshot.dimensions[0]?.score).toBe(1);
-    expect(
-      (snapshot.dimensions[0] as unknown as { findings?: unknown }).findings,
-    ).toBeUndefined();
+    expect((snapshot.dimensions[0] as unknown as { findings?: unknown }).findings).toBeUndefined();
     expect(
       (snapshot as unknown as { topRecommendations?: unknown }).topRecommendations,
     ).toBeUndefined();

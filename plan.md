@@ -83,12 +83,12 @@ interface LLMJudge {
 
 ## Dimensions and Weights
 
-| Dimension               | Weight | Key Deterministic Checks                                |
-|-------------------------|--------|---------------------------------------------------------|
-| `claude-code-setup`     | 35%    | CLAUDE.md presence, hooks in settings.json, MCP config  |
-| `project-structure`     | 25%    | Hexagonal dirs, walking skeleton markers                |
-| `test-infrastructure`   | 25%    | Test files, framework config, Scenario/Factory pattern  |
-| `documentation`         | 15%    | README, TSDoc on exports, ADR directory                 |
+| Dimension             | Weight | Key Deterministic Checks                               |
+| --------------------- | ------ | ------------------------------------------------------ |
+| `claude-code-setup`   | 35%    | CLAUDE.md presence, hooks in settings.json, MCP config |
+| `project-structure`   | 25%    | Hexagonal dirs, walking skeleton markers               |
+| `test-infrastructure` | 25%    | Test files, framework config, Scenario/Factory pattern |
+| `documentation`       | 15%    | README, TSDoc on exports, ADR directory                |
 
 **Scoring:** `finalDimensionScore = 0.4 * deterministicScore + 0.6 * llmScore`
 
@@ -101,16 +101,20 @@ interface LLMJudge {
 ## Kernel Types
 
 ```typescript
-interface Action<R> { readonly _resultType?: R }
-interface Query<R> extends Action<R> { readonly _queryBrand: void }
-type Result<T> = { ok: true; value: T } | { ok: false; error: DomainError }
+interface Action<R> {
+  readonly _resultType?: R;
+}
+interface Query<R> extends Action<R> {
+  readonly _queryBrand: void;
+}
+type Result<T> = { ok: true; value: T } | { ok: false; error: DomainError };
 interface Handler<A extends Action<unknown>> {
-  supports(): ReadonlySet<new (...args: unknown[]) => A>
-  handle(action: A): Promise<Result<unknown>>
+  supports(): ReadonlySet<new (...args: unknown[]) => A>;
+  handle(action: A): Promise<Result<unknown>>;
 }
 class Mediator {
-  constructor(handlers: ReadonlyArray<Handler<Action<unknown>>>)
-  async dispatch<R>(action: Action<R>): Promise<Result<R>>
+  constructor(handlers: ReadonlyArray<Handler<Action<unknown>>>);
+  async dispatch<R>(action: Action<R>): Promise<Result<R>>;
 }
 ```
 
@@ -160,12 +164,14 @@ Return valid JSON only:
 ### Per-dimension rubrics (user message, one per call)
 
 **Claude Code Setup (35%)**
+
 - CLAUDE.md present & substantive >200 words (+10+10+10+10)
 - Pre-commit hooks configured in .claude/settings.json (+10+15)
 - MCP servers configured (+5+10)
 - Custom skills and tool permissions (+10+10)
 
 **Project Structure (25%)**
+
 - Hexagonal dirs (application/, domain/, infrastructure/) (+25)
 - Domain and infrastructure cleanly separated (+15)
 - Composition root pattern visible (+10)
@@ -173,6 +179,7 @@ Return valid JSON only:
 - Consistent file naming (+10+10)
 
 **Test Infrastructure (25%)**
+
 - Test files present, >5, organised by aggregate (+15+10+15)
 - Scenario pattern (data builders) (+15)
 - Fakes present, not mocks (+10)
@@ -180,6 +187,7 @@ Return valid JSON only:
 - Test runner configured (+10), integration tests (+10), mutation testing (+5)
 
 **Documentation (15%)**
+
 - README present, describes build/test, describes architecture (+10+15+15)
 - Exported types and port interfaces documented (+20+15)
 - ADR directory present, CLAUDE.md kept up to date (+15+10)

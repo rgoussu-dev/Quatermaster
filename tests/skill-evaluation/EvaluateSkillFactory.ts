@@ -41,7 +41,10 @@ class RoutingStubJudge extends StubSkillJudge {
     super();
   }
 
-  override async judge(request: { actualOutput: string; expectedBehavior: string }): Promise<SkillJudgeResponse> {
+  override async judge(request: {
+    actualOutput: string;
+    expectedBehavior: string;
+  }): Promise<SkillJudgeResponse> {
     // Match by finding the case whose output appears in actualOutput
     for (const c of this.dataset.cases) {
       if (request.actualOutput.includes(c.prompt)) {
@@ -84,7 +87,10 @@ class BehaviorRoutingJudge extends StubSkillJudge {
     super();
   }
 
-  override async judge(request: { actualOutput: string; expectedBehavior: string }): Promise<SkillJudgeResponse> {
+  override async judge(request: {
+    actualOutput: string;
+    expectedBehavior: string;
+  }): Promise<SkillJudgeResponse> {
     for (const c of this.dataset.cases) {
       if (c.expectedBehavior === request.expectedBehavior) {
         return this.responses.get(c.id) ?? this.fallback;

@@ -16,7 +16,10 @@ src/
 export function wellConfiguredSnapshot(): ProjectSnapshot {
   return {
     projectPath: '/test/well-configured',
-    claudeMd: `# Project\n\nThis project uses hexagonal architecture with ports and adapters.\nAll business logic lives in domain/core. Tests use the Scenario+Factory+fakes pattern.\nCommit via trunk-based development with Conventional Commits.`.repeat(2),
+    claudeMd:
+      `# Project\n\nThis project uses hexagonal architecture with ports and adapters.\nAll business logic lives in domain/core. Tests use the Scenario+Factory+fakes pattern.\nCommit via trunk-based development with Conventional Commits.`.repeat(
+        2,
+      ),
     readmeMd: `# My Project\n\nA well-documented project.\n\n## Build\n\n\`npm run build\`\n\n## Test\n\n\`npm test\`\n\n## Architecture\n\nHexagonal architecture with domain, application, and infrastructure layers.`,
     directoryTree: BASE_TREE + '\ntests/\n  evaluation/\n.github/\n  workflows/',
     testFilePaths: [

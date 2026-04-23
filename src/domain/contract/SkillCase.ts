@@ -18,7 +18,8 @@ export interface ExpectedArtifact {
    * expected artifact in the case declares a golden.
    *
    * In JSON datasets this is authored as `goldenPath` (a path relative to
-   * the dataset file); the loader resolves it to the content string here.
+   * the dataset file — absolute paths and `..` traversal are rejected);
+   * the loader resolves it to the content string here.
    */
   readonly goldenContent?: string;
 }
