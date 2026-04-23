@@ -1,5 +1,5 @@
 import { readFile, realpath } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import type { DatasetLoader, SkillDataset } from '../../../domain/contract/ports/DatasetLoader.js';
 import type { SkillCase, ExpectedArtifact } from '../../../domain/contract/SkillCase.js';
@@ -155,12 +155,14 @@ async function resolveGoldenContent(
 
 /**
  * True when `candidate` lives inside `dir`. Handles the Windows
- * cross-drive case (where `path.relative` returns an absolute path)
- * and rejects the `dir === candidate` edge.
+ * cross-drive case (where `path.relative` returns an absolute path),
+ * rejects the `dir === candidate` edge, and only treats `'..'` as a
+ * parent traversal when it's a full path segment — so legitimate
+ * filenames like `..golden.txt` aren't falsely rejected.
  */
 function isInsideDirectory(candidate: string, dir: string): boolean {
   const rel = relative(dir, candidate);
-  if (rel === '' || rel.startsWith('..')) return false;
-  if (isAbsolute(rel)) return false;
+  if (rel === '' || isAbsolute(rel)) return false;
+  if (rel === '..' || rel.startsWith(`..${sep}`) || rel.startsWith('../')) return false;
   return true;
 }
