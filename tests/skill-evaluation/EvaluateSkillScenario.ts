@@ -156,3 +156,87 @@ export function workspaceJudgeResponses(): Map<string, SkillJudgeResponse> {
     ['adversarial', { score: 95, observations: ['Correctly refused to commit secrets'] }],
   ]);
 }
+
+const GOLDEN_CHANGELOG = `## v1.2.0
+- feat: add login button
+- fix: handle expired session gracefully
+`;
+
+/**
+ * Dataset exercising the diff-similarity metric: one case with a golden
+ * where the agent output is close, one where the agent output is far.
+ */
+export function similarityDataset(): SkillDataset {
+  return {
+    cases: [
+      {
+        id: 'similarity-close',
+        prompt: 'Append the v1.2.0 changelog entry.',
+        expectedBehavior: 'CHANGELOG.md lists the two changes under v1.2.0.',
+        threshold: 70,
+        scenarioType: 'ideal',
+        expectedArtifacts: [{ path: 'CHANGELOG.md', goldenContent: GOLDEN_CHANGELOG }],
+      },
+      {
+        id: 'similarity-far',
+        prompt: 'Append a release changelog entry.',
+        expectedBehavior: 'CHANGELOG.md lists the release changes.',
+        threshold: 70,
+        scenarioType: 'realistic',
+        expectedArtifacts: [{ path: 'CHANGELOG.md', goldenContent: GOLDEN_CHANGELOG }],
+      },
+    ],
+  };
+}
+
+/** Outcomes: one near-match, one wildly different. */
+export function similarityOutcomes(): Map<string, AgentRunOutcome> {
+  const ds = similarityDataset();
+  const [close, far] = ds.cases;
+  if (!close || !far) throw new Error('similarityDataset() changed unexpectedly');
+
+  // Change one line relative to golden — 3 lines total, 1 edit → ~67% similarity.
+  const closeContent = `## v1.2.0
+- feat: add login button
+- fix: session expiry bug
+`;
+
+  return new Map<string, AgentRunOutcome>([
+    [
+      `${SKILL_PATH}::${close.prompt}`,
+      {
+        stdout: 'Appended changelog.',
+        stderr: '',
+        exitCode: 0,
+        durationMs: 12,
+        workspacePath: '/tmp/fake-workspace-close',
+        fileChanges: [{ path: 'CHANGELOG.md', changeType: 'created', contentAfter: closeContent }],
+      },
+    ],
+    [
+      `${SKILL_PATH}::${far.prompt}`,
+      {
+        stdout: 'Wrote something unrelated.',
+        stderr: '',
+        exitCode: 0,
+        durationMs: 14,
+        workspacePath: '/tmp/fake-workspace-far',
+        fileChanges: [
+          {
+            path: 'CHANGELOG.md',
+            changeType: 'created',
+            contentAfter: 'totally\nunrelated\ncontent\n',
+          },
+        ],
+      },
+    ],
+  ]);
+}
+
+/** Judge responses — uniformly high so failures must come from the metric. */
+export function similarityJudgeResponses(): Map<string, SkillJudgeResponse> {
+  return new Map([
+    ['similarity-close', { score: 95, observations: ['Close to golden'] }],
+    ['similarity-far', { score: 95, observations: ['Judge did not notice'] }],
+  ]);
+}

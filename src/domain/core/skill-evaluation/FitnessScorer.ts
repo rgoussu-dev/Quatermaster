@@ -1,11 +1,14 @@
 import type { AgentRunOutcome } from '../../contract/AgentRunOutcome.js';
 import type { SkillCase, ExpectedArtifact } from '../../contract/SkillCase.js';
+import type { FileDiff } from '../../contract/FileDiff.js';
 import type { MetricScore } from '../../contract/SkillEvaluationResult.js';
 import type { SkillJudgeResponse } from '../../contract/ports/SkillJudge.js';
+import { lineSimilarity } from './lineSimilarity.js';
 
 /** Default metric weights — only applied when not overridden by the case. */
 export const DEFAULT_METRIC_WEIGHTS: Readonly<Record<string, number>> = {
   'artifact-presence': 0.4,
+  'diff-similarity': 0.3,
   'exit-code': 0.1,
   'llm-judge': 0.5,
 };
@@ -13,6 +16,7 @@ export const DEFAULT_METRIC_WEIGHTS: Readonly<Record<string, number>> = {
 /** Known metric ids the scorer can emit. */
 export const METRIC_IDS = {
   artifactPresence: 'artifact-presence',
+  diffSimilarity: 'diff-similarity',
   exitCode: 'exit-code',
   llmJudge: 'llm-judge',
 } as const;
@@ -29,11 +33,13 @@ export class FitnessScorer {
     judgement: SkillJudgeResponse,
   ): { readonly overallScore: number; readonly metrics: readonly MetricScore[] } {
     const artifact = this.scoreArtifacts(skillCase.expectedArtifacts, outcome);
+    const similarity = this.scoreSimilarity(skillCase.expectedArtifacts, outcome);
     const exit = this.scoreExitCode(outcome);
     const llm = this.scoreJudge(judgement);
 
     const metrics: MetricScore[] = [];
     if (artifact) metrics.push(this.weighted(skillCase, artifact));
+    if (similarity) metrics.push(this.weighted(skillCase, similarity));
     metrics.push(this.weighted(skillCase, exit));
     metrics.push(this.weighted(skillCase, llm));
 
@@ -99,6 +105,38 @@ export class FitnessScorer {
     };
   }
 
+  private scoreSimilarity(
+    expected: readonly ExpectedArtifact[] | undefined,
+    outcome: AgentRunOutcome,
+  ): Omit<MetricScore, 'weight'> | null {
+    if (!expected) return null;
+    const withGolden = expected.filter((a) => a.goldenContent !== undefined);
+    if (withGolden.length === 0) return null;
+
+    const changesByPath = new Map(outcome.fileChanges.map((c) => [c.path, c]));
+    const perArtifact: { path: string; similarity: number }[] = [];
+    for (const artifact of withGolden) {
+      const produced = producedContent(changesByPath.get(artifact.path));
+      const similarity =
+        produced === null ? 0 : lineSimilarity(produced, artifact.goldenContent!);
+      perArtifact.push({ path: artifact.path, similarity });
+    }
+
+    const avg = Math.round(
+      perArtifact.reduce((sum, r) => sum + r.similarity, 0) / perArtifact.length,
+    );
+    const rationale = perArtifact
+      .map((r) => `${r.path}: ${r.similarity}%`)
+      .join(', ');
+
+    return {
+      metricId: METRIC_IDS.diffSimilarity,
+      label: 'Diff similarity',
+      score: avg,
+      rationale,
+    };
+  }
+
   private scoreExitCode(outcome: AgentRunOutcome): Omit<MetricScore, 'weight'> {
     const ok = outcome.exitCode === 0;
     return {
@@ -122,6 +160,16 @@ export class FitnessScorer {
           : judgement.observations.join('; '),
     };
   }
+}
+
+/**
+ * Returns the post-run content of a produced file, or `null` if the file
+ * was deleted, never produced, or had no captured contentAfter.
+ */
+function producedContent(change: FileDiff | undefined): string | null {
+  if (!change) return null;
+  if (change.changeType === 'deleted') return null;
+  return change.contentAfter ?? null;
 }
 
 function aggregate(metrics: readonly MetricScore[]): number {
