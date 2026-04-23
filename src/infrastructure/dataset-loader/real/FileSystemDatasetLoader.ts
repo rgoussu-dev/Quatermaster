@@ -27,7 +27,7 @@ const SkillCaseSchema = z.object({
   threshold: z.number().int().min(0).max(100).default(70),
   scenarioType: ScenarioTypeSchema.optional(),
   expectedArtifacts: z.array(ExpectedArtifactSchema).optional(),
-  metricWeights: z.record(z.string(), z.number()).optional(),
+  metricWeights: z.record(z.string(), z.number().min(0).finite()).optional(),
   seedRepoPath: z.string().optional(),
 });
 

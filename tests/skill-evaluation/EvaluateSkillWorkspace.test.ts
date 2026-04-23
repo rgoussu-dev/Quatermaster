@@ -154,4 +154,32 @@ describe('EvaluateSkill (workspace + fitness)', () => {
     expect(missing?.score).toBe(85);
     expect(missing?.passed).toBe(true);
   });
+
+  it('does not crash on an invalid contentPattern regex', async () => {
+    const dataset = workspaceDataset();
+    const override = {
+      ...dataset,
+      cases: dataset.cases.map((c) =>
+        c.id === 'artifact-ideal'
+          ? {
+              ...c,
+              expectedArtifacts: [{ path: 'COMMIT_MSG', contentPattern: '[unclosed' }],
+            }
+          : c,
+      ),
+    };
+    const mediator = buildWorkspaceMediator(
+      override,
+      workspaceOutcomes(),
+      workspaceJudgeResponses(),
+    );
+    const result = await mediator.dispatch(new EvaluateSkill(SKILL_PATH, DATASET_PATH));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const ideal = result.value.cases.find((c) => c.id === 'artifact-ideal');
+    const artifactMetric = ideal?.metrics?.find((m) => m.metricId === 'artifact-presence');
+    expect(artifactMetric?.score).toBe(0);
+    expect(artifactMetric?.rationale).toMatch(/invalid content pattern/);
+  });
 });

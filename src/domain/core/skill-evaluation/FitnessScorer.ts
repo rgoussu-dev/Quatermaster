@@ -82,7 +82,14 @@ export class FitnessScorer {
         continue;
       }
       if (artifact.contentPattern && change?.contentAfter !== undefined) {
-        const re = new RegExp(artifact.contentPattern);
+        let re: RegExp;
+        try {
+          re = new RegExp(artifact.contentPattern);
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          misses.push(`invalid content pattern ${artifact.path}: ${reason}`);
+          continue;
+        }
         if (!re.test(change.contentAfter)) {
           misses.push(`content mismatch ${artifact.path}`);
           continue;

@@ -93,4 +93,26 @@ describe('FileSystemDatasetLoader goldenPath resolution', () => {
     const loader = new FileSystemDatasetLoader();
     await expect(loader.load(datasetPath)).rejects.toThrow(/goldenPath.*does-not-exist/);
   });
+
+  it('rejects negative values in metricWeights at load time', async () => {
+    const datasetPath = join(rootDir, 'cases.json');
+    await writeFile(
+      datasetPath,
+      JSON.stringify({
+        cases: [
+          {
+            id: 'c1',
+            prompt: 'do it',
+            expectedBehavior: 'anything',
+            threshold: 70,
+            metricWeights: { 'llm-judge': -0.5 },
+          },
+        ],
+      }),
+      'utf-8',
+    );
+
+    const loader = new FileSystemDatasetLoader();
+    await expect(loader.load(datasetPath)).rejects.toThrow(/validation/);
+  });
 });

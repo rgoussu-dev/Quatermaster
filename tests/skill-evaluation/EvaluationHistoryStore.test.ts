@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -88,5 +88,29 @@ describe('FileSystemEvaluationHistoryStore', () => {
 
     const latest = await store.loadLatest(KEY);
     expect(latest?.evaluatedAt).toBe('2026-04-23T00:00:00Z');
+  });
+
+  it('falls back to an earlier valid snapshot when the latest file is corrupt', async () => {
+    const store = new FileSystemEvaluationHistoryStore<EvaluationHistorySnapshot>(rootDir);
+    await store.save(KEY, snap('2026-04-22T00:00:00Z', 1));
+    const dir = join(rootDir, KEY);
+    await writeFile(join(dir, '2026-04-23T00-00-00-000Z.json'), '{ this is not json', 'utf-8');
+
+    const loaded = await store.loadLatest(KEY);
+    expect(loaded?.evaluatedAt).toBe('2026-04-22T00:00:00Z');
+  });
+
+  it('skips snapshots missing evaluatedAt and keeps looking', async () => {
+    const store = new FileSystemEvaluationHistoryStore<EvaluationHistorySnapshot>(rootDir);
+    await store.save(KEY, snap('2026-04-22T00:00:00Z', 1));
+    const dir = join(rootDir, KEY);
+    await writeFile(
+      join(dir, '2026-04-23T00-00-00-000Z.json'),
+      JSON.stringify({ notEvaluatedAt: 'oops' }),
+      'utf-8',
+    );
+
+    const loaded = await store.loadLatest(KEY);
+    expect(loaded?.evaluatedAt).toBe('2026-04-22T00:00:00Z');
   });
 });
