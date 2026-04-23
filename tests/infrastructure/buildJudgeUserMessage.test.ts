@@ -13,6 +13,7 @@ function snapshot(overrides: Partial<ProjectSnapshot> = {}): ProjectSnapshot {
     claudeConfigPaths: [],
     claudeSettingsJson: null,
     sourceFilePaths: [],
+    sourceFileSamples: [],
     hasLockfile: false,
     ciConfigPaths: [],
     ...overrides,

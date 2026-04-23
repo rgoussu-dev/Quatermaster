@@ -241,14 +241,14 @@ function scoreDocumentation(snapshot: ProjectSnapshot): DimensionAssessment {
     });
   }
 
-  const hasDocComments = snapshot.testFileSamples.some(
+  const hasDocComments = snapshot.sourceFileSamples.some(
     (s) => s.content.includes('/**') || s.content.includes('///'),
   );
   if (hasDocComments) {
     pts += 15;
   } else {
     findings.push({
-      description: 'No doc comments (/** */ or ///) found in sampled files.',
+      description: 'No doc comments (/** */ or ///) found in sampled source files.',
       severity: 'warning',
       source: 'no-doc-comments',
     });

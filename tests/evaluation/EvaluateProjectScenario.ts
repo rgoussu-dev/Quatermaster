@@ -45,6 +45,12 @@ export function wellConfiguredSnapshot(): ProjectSnapshot {
       'src/infrastructure/project-scanner/real/FileSystemScanner.ts',
       'vitest.config.ts',
     ],
+    sourceFileSamples: [
+      {
+        path: 'src/domain/contract/ports/ProjectScanner.ts',
+        content: `/**\n * Secondary port — reads a project and returns a snapshot.\n */\nexport interface ProjectScanner {\n  scan(projectPath: string): Promise<ProjectSnapshot>;\n}\n`,
+      },
+    ],
     hasLockfile: true,
     ciConfigPaths: ['.github/workflows/ci.yml'],
   };
@@ -62,6 +68,7 @@ export function minimalSnapshot(): ProjectSnapshot {
     claudeConfigPaths: [],
     claudeSettingsJson: null,
     sourceFilePaths: ['src/index.ts'],
+    sourceFileSamples: [],
     hasLockfile: false,
     ciConfigPaths: [],
   };
