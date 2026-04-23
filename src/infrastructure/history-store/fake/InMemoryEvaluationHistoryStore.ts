@@ -1,35 +1,26 @@
 import type { EvaluationHistoryStore } from '../../../domain/contract/ports/EvaluationHistoryStore.js';
-import type { EvaluationHistorySnapshot } from '../../../domain/contract/EvaluationHistorySnapshot.js';
 
 /**
  * Fake implementation of EvaluationHistoryStore.
- * Keeps an in-memory list of snapshots per `${skillPath}::${datasetPath}` key —
- * `loadLatest` returns the last one saved. Canonical reference for tests.
+ * Keeps an in-memory list of snapshots per key; `loadLatest` returns the
+ * last one saved. Canonical reference for tests.
  */
-export class InMemoryEvaluationHistoryStore implements EvaluationHistoryStore {
-  private readonly byKey = new Map<string, EvaluationHistorySnapshot[]>();
+export class InMemoryEvaluationHistoryStore<T> implements EvaluationHistoryStore<T> {
+  private readonly byKey = new Map<string, T[]>();
 
-  async save(snapshot: EvaluationHistorySnapshot): Promise<void> {
-    const key = this.key(snapshot.skillPath, snapshot.datasetPath);
+  async save(key: string, snapshot: T): Promise<void> {
     const existing = this.byKey.get(key) ?? [];
     this.byKey.set(key, [...existing, snapshot]);
   }
 
-  async loadLatest(
-    skillPath: string,
-    datasetPath: string,
-  ): Promise<EvaluationHistorySnapshot | null> {
-    const list = this.byKey.get(this.key(skillPath, datasetPath)) ?? [];
+  async loadLatest(key: string): Promise<T | null> {
+    const list = this.byKey.get(key) ?? [];
     return list[list.length - 1] ?? null;
   }
 
   /** Test helper — seeds the store with an initial snapshot. */
-  seed(snapshot: EvaluationHistorySnapshot): this {
-    void this.save(snapshot);
+  seed(key: string, snapshot: T): this {
+    void this.save(key, snapshot);
     return this;
-  }
-
-  private key(skillPath: string, datasetPath: string): string {
-    return `${skillPath}::${datasetPath}`;
   }
 }

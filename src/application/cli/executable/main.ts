@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path';
 import { Mediator } from '../../../domain/contract/kernel/Mediator.js';
 import { EvaluateProject } from '../../../domain/core/evaluation/EvaluateProject.js';
 import { EvaluateProjectHandler } from '../../../domain/core/evaluation/EvaluateProjectHandler.js';
+import { toProjectHistorySnapshot } from '../../../domain/core/evaluation/toProjectHistorySnapshot.js';
+import { computeProjectEvaluationDelta } from '../../../domain/core/evaluation/computeProjectEvaluationDelta.js';
 import { EvaluateSkill } from '../../../domain/core/skill-evaluation/EvaluateSkill.js';
 import { EvaluateSkillHandler } from '../../../domain/core/skill-evaluation/EvaluateSkillHandler.js';
 import { toHistorySnapshot } from '../../../domain/core/skill-evaluation/toHistorySnapshot.js';
@@ -14,12 +16,24 @@ import { ClaudeCodeJudge } from '../../../infrastructure/llm-judge/claude-cli/Cl
 import { ClaudeCodeSkillRunner } from '../../../infrastructure/skill-runner/real/ClaudeCodeSkillRunner.js';
 import { FileSystemAgentRunWorkspace } from '../../../infrastructure/agent-workspace/real/FileSystemAgentRunWorkspace.js';
 import { FileSystemDatasetLoader } from '../../../infrastructure/dataset-loader/real/FileSystemDatasetLoader.js';
-import { FileSystemEvaluationHistoryStore } from '../../../infrastructure/history-store/real/FileSystemEvaluationHistoryStore.js';
+import {
+  FileSystemEvaluationHistoryStore,
+  projectHistoryKey,
+  skillHistoryKey,
+} from '../../../infrastructure/history-store/real/FileSystemEvaluationHistoryStore.js';
 import { ClaudeCodeSkillJudge } from '../../../infrastructure/skill-judge/claude-cli/ClaudeCodeSkillJudge.js';
 import { AnthropicSkillJudge } from '../../../infrastructure/skill-judge/real/AnthropicSkillJudge.js';
+import type { EvaluationHistorySnapshot } from '../../../domain/contract/EvaluationHistorySnapshot.js';
+import type { ProjectHistorySnapshot } from '../../../domain/contract/ProjectHistorySnapshot.js';
 import type { LLMJudge } from '../../../domain/contract/ports/LLMJudge.js';
 import type { SkillJudge } from '../../../domain/contract/ports/SkillJudge.js';
-import { printReport, printSkillReport, printSkillDelta, printError } from './reporter.js';
+import {
+  printReport,
+  printSkillReport,
+  printSkillDelta,
+  printProjectDelta,
+  printError,
+} from './reporter.js';
 
 program
   .name('quatermaster')
@@ -34,22 +48,48 @@ program
     'LLM judge backend: "claude-cli" (uses local claude CLI, no API key needed) or "api" (uses ANTHROPIC_API_KEY)',
     'claude-cli',
   )
-  .action(async (targetPath: string, opts: { judge: string }) => {
-    const judge = buildJudge(opts.judge);
-    const projectPath = resolve(targetPath);
-    const scanner = new FileSystemScanner();
-    const handler = new EvaluateProjectHandler(scanner, judge);
-    const mediator = new Mediator([handler]);
+  .option(
+    '--history-dir <path>',
+    'Directory for persisted evaluation snapshots. Defaults to <cwd>/.quatermaster/history.',
+  )
+  .option('--no-history', 'Skip loading and writing the per-run history snapshot.')
+  .action(
+    async (
+      targetPath: string,
+      opts: { judge: string; history: boolean; historyDir?: string },
+    ) => {
+      const judge = buildJudge(opts.judge);
+      const projectPath = resolve(targetPath);
+      const scanner = new FileSystemScanner();
+      const handler = new EvaluateProjectHandler(scanner, judge);
+      const mediator = new Mediator([handler]);
 
-    const result = await mediator.dispatch(new EvaluateProject(projectPath));
+      const historyStore = opts.history
+        ? new FileSystemEvaluationHistoryStore<ProjectHistorySnapshot>(
+            opts.historyDir ?? join(process.cwd(), '.quatermaster', 'history'),
+          )
+        : null;
+      const key = projectHistoryKey(projectPath);
+      const previous = historyStore ? await historyStore.loadLatest(key) : null;
 
-    if (!result.ok) {
-      printError(result.error);
-      process.exit(1);
-    }
+      const result = await mediator.dispatch(new EvaluateProject(projectPath));
 
-    printReport(result.value);
-  });
+      if (!result.ok) {
+        printError(result.error);
+        process.exit(1);
+      }
+
+      printReport(result.value);
+
+      const current = toProjectHistorySnapshot(result.value);
+      if (previous) {
+        printProjectDelta(computeProjectEvaluationDelta(previous, current));
+      }
+      if (historyStore) {
+        await historyStore.save(key, current);
+      }
+    },
+  );
 
 program
   .command('evaluate-skill <skill-path>')
@@ -91,13 +131,12 @@ program
       const mediator = new Mediator([handler]);
 
       const historyStore = opts.history
-        ? new FileSystemEvaluationHistoryStore(
+        ? new FileSystemEvaluationHistoryStore<EvaluationHistorySnapshot>(
             opts.historyDir ?? join(process.cwd(), '.quatermaster', 'history'),
           )
         : null;
-      const previous = historyStore
-        ? await historyStore.loadLatest(resolvedSkillPath, resolvedDatasetPath)
-        : null;
+      const key = skillHistoryKey(resolvedSkillPath, resolvedDatasetPath);
+      const previous = historyStore ? await historyStore.loadLatest(key) : null;
 
       const result = await mediator.dispatch(
         new EvaluateSkill(resolvedSkillPath, resolvedDatasetPath),
@@ -115,7 +154,7 @@ program
         printSkillDelta(computeEvaluationDelta(previous, current));
       }
       if (historyStore) {
-        await historyStore.save(current);
+        await historyStore.save(key, current);
       }
     },
   );

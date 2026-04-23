@@ -5,6 +5,7 @@ import type {
   EvaluationDelta,
   CaseStatusChange,
 } from '../../../domain/contract/EvaluationDelta.js';
+import type { ProjectEvaluationDelta } from '../../../domain/contract/ProjectEvaluationDelta.js';
 import type { DomainError } from '../../../domain/contract/kernel/DomainError.js';
 
 const BAR_WIDTH = 10;
@@ -218,5 +219,40 @@ function signedPoints(n: number): string {
   if (n === 0) return chalk.dim('±0');
   const formatted = n.toFixed(1).replace(/\.0$/, '');
   return n > 0 ? chalk.green(`+${formatted}`) : chalk.red(`${formatted}`);
+}
+
+/** Formats and prints the readiness-eval delta against the previous snapshot. */
+export function printProjectDelta(delta: ProjectEvaluationDelta): void {
+  const divider = chalk.dim('─'.repeat(56));
+  const heavy = chalk.dim('═'.repeat(56));
+
+  console.log();
+  console.log(chalk.bold('DELTA vs PREVIOUS RUN'));
+  console.log(heavy);
+  console.log(
+    `Previous: ${chalk.dim(delta.previous.evaluatedAt)}  ${delta.previous.overallScore}/100  ${delta.previous.overallGrade}`,
+  );
+  console.log(
+    `Current:  ${chalk.dim(delta.current.evaluatedAt)}  ${delta.current.overallScore}/100  ${delta.current.overallGrade}`,
+  );
+  console.log(`Overall score change: ${signedInt(delta.overallScoreChange)}`);
+
+  const moved = delta.dimensions.filter((d) => d.scoreChange !== 0);
+  if (moved.length > 0) {
+    console.log(divider);
+    console.log(chalk.bold('DIMENSION CHANGES'));
+    for (const d of moved) {
+      const gradeChange =
+        d.previousGrade === d.currentGrade
+          ? chalk.dim(d.currentGrade)
+          : chalk.bold(`${d.previousGrade} → ${d.currentGrade}`);
+      console.log(
+        `  ${chalk.dim(d.label.padEnd(24))} ${d.previousScore} → ${d.currentScore}  ${signedInt(d.scoreChange)}  ${gradeChange}`,
+      );
+    }
+  }
+
+  console.log(divider);
+  console.log();
 }
 
