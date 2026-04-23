@@ -19,7 +19,7 @@ export function lineSimilarity(a: string, b: string): number {
 }
 
 function toLines(s: string): readonly string[] {
-  const normalised = s.replace(/\r\n/g, '\n').replace(/\n$/, '');
+  const normalised = s.replace(/\r\n/g, '\n').replace(/\n+$/, '');
   return normalised === '' ? [] : normalised.split('\n');
 }
 

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { cp, mkdtemp, readFile, readdir, stat } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import type {
@@ -14,42 +14,76 @@ const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.quatermaster']);
 /** Hard cap to avoid loading huge binary blobs into memory. */
 const MAX_FILE_BYTES = 256 * 1024;
 
+/** Options for the filesystem-backed agent workspace adapter. */
+export interface FileSystemAgentRunWorkspaceOptions {
+  /** Per-run call timeout in milliseconds. Default 120s. */
+  readonly timeoutMs?: number;
+  /**
+   * When true, leaves the tmp workspace directory on disk after the run
+   * so it can be inspected post-mortem. Default false — the workspace is
+   * removed once the outcome has been captured, to avoid accumulating
+   * tmp dirs across many evaluation runs.
+   */
+  readonly keepWorkspace?: boolean;
+}
+
 /**
  * Real adapter — runs the skill inside a fresh tmp directory, captures the
- * filesystem diff against the seed state, and returns stdout + changes.
+ * filesystem state, and returns stdout + diff + post-run file contents.
  *
  * Isolation is tmp-dir only (no chroot / network sandbox). Callers are
- * responsible for not running untrusted skills with this adapter.
+ * responsible for not running untrusted skills with this adapter. By
+ * default the tmp directory is removed after the outcome has been
+ * captured; pass `{ keepWorkspace: true }` for post-mortem debugging.
  */
 export class FileSystemAgentRunWorkspace implements AgentRunWorkspace {
-  /** @param timeoutMs Per-run call timeout. Default 120s. */
-  constructor(private readonly timeoutMs = 120_000) {}
+  private readonly timeoutMs: number;
+  private readonly keepWorkspace: boolean;
+
+  constructor(options: FileSystemAgentRunWorkspaceOptions = {}) {
+    this.timeoutMs = options.timeoutMs ?? 120_000;
+    this.keepWorkspace = options.keepWorkspace ?? false;
+  }
 
   async run(request: AgentRunRequest): Promise<AgentRunOutcome> {
     const skillContent = await readFile(request.skillPath, 'utf-8');
     const workspacePath = await mkdtemp(join(tmpdir(), 'quatermaster-agent-'));
 
-    if (request.seedRepoPath) {
-      await cp(request.seedRepoPath, workspacePath, {
-        recursive: true,
-        filter: shouldCopy,
-      });
+    try {
+      if (request.seedRepoPath) {
+        await cp(request.seedRepoPath, workspacePath, {
+          recursive: true,
+          filter: shouldCopy,
+        });
+      }
+
+      const before = await snapshot(workspacePath);
+      const prompt = buildPrompt(skillContent, request.userPrompt);
+      const started = Date.now();
+      const { stdout, stderr, exitCode } = await spawnClaude(
+        prompt,
+        workspacePath,
+        this.timeoutMs,
+      );
+      const durationMs = Date.now() - started;
+
+      const after = await snapshot(workspacePath);
+      const fileChanges = diff(before, after);
+
+      return {
+        stdout,
+        stderr,
+        exitCode,
+        durationMs,
+        fileChanges,
+        postRunFiles: after,
+        workspacePath,
+      };
+    } finally {
+      if (!this.keepWorkspace) {
+        await rm(workspacePath, { recursive: true, force: true });
+      }
     }
-
-    const before = await snapshot(workspacePath);
-    const prompt = buildPrompt(skillContent, request.userPrompt);
-    const started = Date.now();
-    const { stdout, stderr, exitCode } = await spawnClaude(
-      prompt,
-      workspacePath,
-      this.timeoutMs,
-    );
-    const durationMs = Date.now() - started;
-
-    const after = await snapshot(workspacePath);
-    const fileChanges = diff(before, after);
-
-    return { stdout, stderr, exitCode, durationMs, fileChanges, workspacePath };
   }
 }
 

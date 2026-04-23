@@ -1,6 +1,5 @@
 import type { AgentRunOutcome } from '../../contract/AgentRunOutcome.js';
 import type { SkillCase, ExpectedArtifact } from '../../contract/SkillCase.js';
-import type { FileDiff } from '../../contract/FileDiff.js';
 import type { MetricScore } from '../../contract/SkillEvaluationResult.js';
 import type { SkillJudgeResponse } from '../../contract/ports/SkillJudge.js';
 import { lineSimilarity } from './lineSimilarity.js';
@@ -62,16 +61,13 @@ export class FitnessScorer {
   ): Omit<MetricScore, 'weight'> | null {
     if (!expected || expected.length === 0) return null;
 
-    const changesByPath = new Map(outcome.fileChanges.map((c) => [c.path, c]));
     const misses: string[] = [];
     let satisfied = 0;
 
     for (const artifact of expected) {
-      const change = changesByPath.get(artifact.path);
       const mustExist = artifact.mustExist ?? true;
-      const exists =
-        change !== undefined &&
-        (change.changeType === 'created' || change.changeType === 'modified');
+      const content = outcome.postRunFiles.get(artifact.path);
+      const exists = content !== undefined;
 
       if (mustExist && !exists) {
         misses.push(`missing ${artifact.path}`);
@@ -81,7 +77,7 @@ export class FitnessScorer {
         misses.push(`unexpectedly present ${artifact.path}`);
         continue;
       }
-      if (artifact.contentPattern && change?.contentAfter !== undefined) {
+      if (artifact.contentPattern && content !== undefined) {
         let re: RegExp;
         try {
           re = new RegExp(artifact.contentPattern);
@@ -90,7 +86,7 @@ export class FitnessScorer {
           misses.push(`invalid content pattern ${artifact.path}: ${reason}`);
           continue;
         }
-        if (!re.test(change.contentAfter)) {
+        if (!re.test(content)) {
           misses.push(`content mismatch ${artifact.path}`);
           continue;
         }
@@ -120,12 +116,11 @@ export class FitnessScorer {
     const withGolden = expected.filter((a) => a.goldenContent !== undefined);
     if (withGolden.length === 0) return null;
 
-    const changesByPath = new Map(outcome.fileChanges.map((c) => [c.path, c]));
     const perArtifact: { path: string; similarity: number }[] = [];
     for (const artifact of withGolden) {
-      const produced = producedContent(changesByPath.get(artifact.path));
+      const produced = outcome.postRunFiles.get(artifact.path);
       const similarity =
-        produced === null ? 0 : lineSimilarity(produced, artifact.goldenContent!);
+        produced === undefined ? 0 : lineSimilarity(produced, artifact.goldenContent!);
       perArtifact.push({ path: artifact.path, similarity });
     }
 
@@ -167,16 +162,6 @@ export class FitnessScorer {
           : judgement.observations.join('; '),
     };
   }
-}
-
-/**
- * Returns the post-run content of a produced file, or `null` if the file
- * was deleted, never produced, or had no captured contentAfter.
- */
-function producedContent(change: FileDiff | undefined): string | null {
-  if (!change) return null;
-  if (change.changeType === 'deleted') return null;
-  return change.contentAfter ?? null;
 }
 
 function aggregate(metrics: readonly MetricScore[]): number {
