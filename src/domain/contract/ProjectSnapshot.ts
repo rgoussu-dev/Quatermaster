@@ -21,6 +21,8 @@ export interface ProjectSnapshot {
   readonly claudeSettingsJson: string | null;
   /** Source file paths relative to root, capped at 100. */
   readonly sourceFilePaths: readonly string[];
+  /** Sampled source file content (first 5 files under src/ or lib/, first 100 lines each). */
+  readonly sourceFileSamples: readonly { path: string; content: string }[];
   /** True if a lockfile exists (package-lock.json, Cargo.lock, poetry.lock, etc.). */
   readonly hasLockfile: boolean;
   /** Paths of CI config files (.github/workflows/, .gitlab-ci.yml, etc.). */

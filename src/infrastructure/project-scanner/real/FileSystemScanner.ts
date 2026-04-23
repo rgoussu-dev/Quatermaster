@@ -50,7 +50,19 @@ const TEST_GLOBS = [
   '**/*Test.java',
 ];
 
-const SOURCE_GLOBS = ['src/**/*.ts', 'src/**/*.js', 'lib/**/*.ts', 'lib/**/*.js'];
+const SOURCE_GLOBS = [
+  'src/**/*.ts',
+  'src/**/*.js',
+  'lib/**/*.ts',
+  'lib/**/*.js',
+  '*.config.ts',
+  '*.config.js',
+  '*.config.mjs',
+  '*.config.cjs',
+  '.mocharc.*',
+  'pytest.ini',
+  'pyproject.toml',
+];
 
 async function readOptional(filePath: string): Promise<string | null> {
   try {
@@ -128,6 +140,16 @@ export class FileSystemScanner implements ProjectScanner {
       .slice(0, 100)
       .map((p) => p.replace(/\\/g, '/'));
 
+    const sourceFileSamples = await Promise.all(
+      sourceFilePaths
+        .filter((p) => p.startsWith('src/') || p.startsWith('lib/'))
+        .slice(0, 5)
+        .map(async (p) => {
+          const content = (await readOptional(join(projectPath, p))) ?? '';
+          return { path: p, content: content.split('\n').slice(0, 100).join('\n') };
+        }),
+    );
+
     const hasLockfile = (
       await Promise.all(
         LOCKFILES.map((f) =>
@@ -150,6 +172,7 @@ export class FileSystemScanner implements ProjectScanner {
       claudeConfigPaths,
       claudeSettingsJson,
       sourceFilePaths,
+      sourceFileSamples,
       hasLockfile,
       ciConfigPaths,
     };

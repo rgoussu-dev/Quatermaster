@@ -21,6 +21,9 @@ export function buildJudgeUserMessage(req: JudgeRequest): string {
   const testList = snapshot.testFilePaths.slice(0, TEST_LIST_CAP).join('\n') || '(none)';
   const testSamples =
     snapshot.testFileSamples.map((s) => `--- ${s.path} ---\n${s.content}`).join('\n\n') || '(none)';
+  const sourceSamples =
+    snapshot.sourceFileSamples.map((s) => `--- ${s.path} ---\n${s.content}`).join('\n\n') ||
+    '(none)';
   const readme = snapshot.readmeMd ? snapshot.readmeMd.slice(0, README_CAP) : '(not present)';
   const settings = redactSecrets(snapshot.claudeSettingsJson) ?? '(not present)';
   const claudeMd = snapshot.claudeMd ?? '(not present)';
@@ -47,6 +50,9 @@ ${testList}
 
 TEST SAMPLES:
 ${testSamples}
+
+SOURCE SAMPLES:
+${sourceSamples}
 
 CI CONFIGS:
 ${snapshot.ciConfigPaths.join('\n') || '(none)'}`;
