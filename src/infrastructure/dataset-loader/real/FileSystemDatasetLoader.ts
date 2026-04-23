@@ -1,5 +1,5 @@
-import { readFile } from 'node:fs/promises';
-import { dirname, relative, resolve } from 'node:path';
+import { readFile, realpath } from 'node:fs/promises';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import type { DatasetLoader, SkillDataset } from '../../../domain/contract/ports/DatasetLoader.js';
 import type { SkillCase, ExpectedArtifact } from '../../../domain/contract/SkillCase.js';
@@ -118,12 +118,32 @@ async function resolveGoldenContent(
   if (parsed.goldenPath === undefined) return undefined;
 
   const absolute = resolve(datasetDir, parsed.goldenPath);
-  const rel = relative(resolve(datasetDir), absolute);
-  if (rel === '' || rel.startsWith('..')) {
+  if (!isInsideDirectory(absolute, resolve(datasetDir))) {
     throw new Error(
       `goldenPath "${parsed.goldenPath}" for artifact "${parsed.path}" escapes the dataset directory`,
     );
   }
+
+  // Second pass: resolve symlinks. If either realpath fails (typically
+  // because the file doesn't yet exist) we fall through to the readFile
+  // call below, which will surface a helpful error. If the file does
+  // exist and a symlink points outside the dataset directory, we reject
+  // here so a hostile dataset can't exfiltrate files via a symlink.
+  try {
+    const realDatasetDir = await realpath(resolve(datasetDir));
+    const realTarget = await realpath(absolute);
+    if (!isInsideDirectory(realTarget, realDatasetDir)) {
+      throw new Error(
+        `goldenPath "${parsed.goldenPath}" for artifact "${parsed.path}" resolves (via symlink) outside the dataset directory`,
+      );
+    }
+  } catch (err) {
+    if (err instanceof Error && /resolves \(via symlink\)/.test(err.message)) {
+      throw err;
+    }
+    // realpath failed for another reason — let readFile surface it.
+  }
+
   try {
     return await readFile(absolute, 'utf-8');
   } catch (err) {
@@ -131,4 +151,16 @@ async function resolveGoldenContent(
       `Failed to load goldenPath "${parsed.goldenPath}" for artifact "${parsed.path}": ${err instanceof Error ? err.message : String(err)}`,
     );
   }
+}
+
+/**
+ * True when `candidate` lives inside `dir`. Handles the Windows
+ * cross-drive case (where `path.relative` returns an absolute path)
+ * and rejects the `dir === candidate` edge.
+ */
+function isInsideDirectory(candidate: string, dir: string): boolean {
+  const rel = relative(dir, candidate);
+  if (rel === '' || rel.startsWith('..')) return false;
+  if (isAbsolute(rel)) return false;
+  return true;
 }

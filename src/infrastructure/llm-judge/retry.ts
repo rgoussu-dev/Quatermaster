@@ -37,21 +37,27 @@ function isRetryable(err: unknown): boolean {
 /**
  * Runs `fn` with exponential backoff on retryable errors. Re-throws the
  * last error once attempts are exhausted.
+ *
+ * `maxAttempts` values below 1 are rejected up front so a caller passing
+ * `0` can never reach the unreachable `throw lastErr` with `lastErr`
+ * still undefined.
  */
 export async function withRetry<T>(fn: () => Promise<T>, opts: RetryOptions = {}): Promise<T> {
   const maxAttempts = opts.maxAttempts ?? 4;
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
+    throw new Error(`withRetry requires maxAttempts >= 1 (got ${maxAttempts})`);
+  }
   const baseDelay = opts.baseDelayMs ?? 500;
   const sleep = opts.sleep ?? defaultSleep;
 
-  let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       return await fn();
     } catch (err) {
-      lastErr = err;
       if (attempt === maxAttempts || !isRetryable(err)) throw err;
       await sleep(baseDelay * 2 ** (attempt - 1));
     }
   }
-  throw lastErr;
+  // Unreachable — the loop either returns or throws every iteration.
+  throw new Error('withRetry: unreachable');
 }
