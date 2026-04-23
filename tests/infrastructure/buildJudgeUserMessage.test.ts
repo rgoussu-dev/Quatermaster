@@ -44,4 +44,47 @@ describe('buildJudgeUserMessage', () => {
     expect(msg).not.toContain('sk-ant-abcdefghijklmnopqrstuv');
     expect(msg).toContain('<redacted');
   });
+
+  it('renders the SOURCE SAMPLES section with path + content when present', () => {
+    const msg = buildJudgeUserMessage({
+      snapshot: snapshot({
+        sourceFileSamples: [
+          { path: 'src/a.ts', content: '/** docs */\nexport const a = 1;' },
+          { path: 'src/b.ts', content: 'export const b = 2;' },
+        ],
+      }),
+      dimension: 'documentation',
+      rubric: 'r',
+    });
+    expect(msg).toContain('SOURCE SAMPLES:');
+    expect(msg).toContain('--- src/a.ts ---');
+    expect(msg).toContain('/** docs */');
+    expect(msg).toContain('--- src/b.ts ---');
+  });
+
+  it('falls back to (none) when there are no source samples', () => {
+    const msg = buildJudgeUserMessage({
+      snapshot: snapshot({ sourceFileSamples: [] }),
+      dimension: 'documentation',
+      rubric: 'r',
+    });
+    expect(msg).toMatch(/SOURCE SAMPLES:\s*\n\(none\)/);
+  });
+
+  it('redacts credential-shaped strings inside source samples', () => {
+    const msg = buildJudgeUserMessage({
+      snapshot: snapshot({
+        sourceFileSamples: [
+          {
+            path: 'src/leak.ts',
+            content: 'const key = "sk-ant-abcdefghijklmnopqrstuv";',
+          },
+        ],
+      }),
+      dimension: 'documentation',
+      rubric: 'r',
+    });
+    expect(msg).not.toContain('sk-ant-abcdefghijklmnopqrstuv');
+    expect(msg).toContain('<redacted-anthropic-key>');
+  });
 });

@@ -19,11 +19,11 @@ const TEST_LIST_CAP = 20;
 export function buildJudgeUserMessage(req: JudgeRequest): string {
   const { snapshot, dimension, rubric } = req;
   const testList = snapshot.testFilePaths.slice(0, TEST_LIST_CAP).join('\n') || '(none)';
-  const testSamples =
-    snapshot.testFileSamples.map((s) => `--- ${s.path} ---\n${s.content}`).join('\n\n') || '(none)';
-  const sourceSamples =
-    snapshot.sourceFileSamples.map((s) => `--- ${s.path} ---\n${s.content}`).join('\n\n') ||
+  const renderSamples = (samples: readonly { path: string; content: string }[]): string =>
+    samples.map((s) => `--- ${s.path} ---\n${redactSecrets(s.content) ?? ''}`).join('\n\n') ||
     '(none)';
+  const testSamples = renderSamples(snapshot.testFileSamples);
+  const sourceSamples = renderSamples(snapshot.sourceFileSamples);
   const readme = snapshot.readmeMd ? snapshot.readmeMd.slice(0, README_CAP) : '(not present)';
   const settings = redactSecrets(snapshot.claudeSettingsJson) ?? '(not present)';
   const claudeMd = snapshot.claudeMd ?? '(not present)';

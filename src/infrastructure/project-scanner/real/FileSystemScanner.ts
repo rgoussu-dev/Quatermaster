@@ -59,6 +59,7 @@ const SOURCE_GLOBS = [
   '*.config.js',
   '*.config.mjs',
   '*.config.cjs',
+  '.mocharc',
   '.mocharc.*',
   'pytest.ini',
   'pyproject.toml',
