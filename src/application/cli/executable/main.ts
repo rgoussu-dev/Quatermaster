@@ -1,0 +1,110 @@
+import { program } from 'commander';
+import Anthropic from '@anthropic-ai/sdk';
+import { resolve } from 'node:path';
+import { Mediator } from '../../../domain/contract/kernel/Mediator.js';
+import { EvaluateProject } from '../../../domain/core/evaluation/EvaluateProject.js';
+import { EvaluateProjectHandler } from '../../../domain/core/evaluation/EvaluateProjectHandler.js';
+import { EvaluateSkill } from '../../../domain/core/skill-evaluation/EvaluateSkill.js';
+import { EvaluateSkillHandler } from '../../../domain/core/skill-evaluation/EvaluateSkillHandler.js';
+import { FileSystemScanner } from '../../../infrastructure/project-scanner/real/FileSystemScanner.js';
+import { AnthropicLLMJudge } from '../../../infrastructure/llm-judge/real/AnthropicLLMJudge.js';
+import { ClaudeCodeJudge } from '../../../infrastructure/llm-judge/claude-cli/ClaudeCodeJudge.js';
+import { ClaudeCodeSkillRunner } from '../../../infrastructure/skill-runner/real/ClaudeCodeSkillRunner.js';
+import { FileSystemDatasetLoader } from '../../../infrastructure/dataset-loader/real/FileSystemDatasetLoader.js';
+import { ClaudeCodeSkillJudge } from '../../../infrastructure/skill-judge/claude-cli/ClaudeCodeSkillJudge.js';
+import { AnthropicSkillJudge } from '../../../infrastructure/skill-judge/real/AnthropicSkillJudge.js';
+import type { LLMJudge } from '../../../domain/contract/ports/LLMJudge.js';
+import type { SkillJudge } from '../../../domain/contract/ports/SkillJudge.js';
+import { printReport, printSkillReport, printError } from './reporter.js';
+
+program
+  .name('quatermaster')
+  .description("Evaluates a project's agentic coding readiness.")
+  .version('0.1.0');
+
+program
+  .command('evaluate <path>')
+  .description("Evaluate a project's agentic coding readiness and print a scored report.")
+  .option(
+    '--judge <mode>',
+    'LLM judge backend: "claude-cli" (uses local claude CLI, no API key needed) or "api" (uses ANTHROPIC_API_KEY)',
+    'claude-cli',
+  )
+  .action(async (targetPath: string, opts: { judge: string }) => {
+    const judge = buildJudge(opts.judge);
+    const projectPath = resolve(targetPath);
+    const scanner = new FileSystemScanner();
+    const handler = new EvaluateProjectHandler(scanner, judge);
+    const mediator = new Mediator([handler]);
+
+    const result = await mediator.dispatch(new EvaluateProject(projectPath));
+
+    if (!result.ok) {
+      printError(result.error);
+      process.exit(1);
+    }
+
+    printReport(result.value);
+  });
+
+program
+  .command('evaluate-skill <skill-path>')
+  .description('Run a skill against a dataset and validate outputs with an LLM judge.')
+  .requiredOption('--dataset <path>', 'Path to the JSON dataset file.')
+  .option(
+    '--judge <mode>',
+    'LLM judge backend: "claude-cli" (uses local claude CLI, no API key needed) or "api" (uses ANTHROPIC_API_KEY)',
+    'claude-cli',
+  )
+  .action(async (skillPath: string, opts: { dataset: string; judge: string }) => {
+    const resolvedSkillPath = resolve(skillPath);
+    const resolvedDatasetPath = resolve(opts.dataset);
+    const skillJudge = buildSkillJudge(opts.judge);
+    const runner = new ClaudeCodeSkillRunner();
+    const loader = new FileSystemDatasetLoader();
+    const handler = new EvaluateSkillHandler(runner, loader, skillJudge);
+    const mediator = new Mediator([handler]);
+
+    const result = await mediator.dispatch(new EvaluateSkill(resolvedSkillPath, resolvedDatasetPath));
+
+    if (!result.ok) {
+      printError(result.error);
+      process.exit(1);
+    }
+
+    printSkillReport(result.value);
+  });
+
+program.parse();
+
+function buildSkillJudge(mode: string): SkillJudge {
+  if (mode === 'api') {
+    const apiKey = process.env['ANTHROPIC_API_KEY'];
+    if (!apiKey) {
+      console.error('Error: --judge api requires ANTHROPIC_API_KEY to be set.');
+      process.exit(1);
+    }
+    return new AnthropicSkillJudge(new Anthropic({ apiKey }));
+  }
+  if (mode === 'claude-cli') {
+    return new ClaudeCodeSkillJudge();
+  }
+  console.error(`Error: unknown --judge mode "${mode}". Use "claude-cli" or "api".`);
+  process.exit(1);
+}
+
+function buildJudge(mode: string): LLMJudge {
+  if (mode === 'api') {
+    const apiKey = process.env['ANTHROPIC_API_KEY'];
+    if (!apiKey) {
+      console.error('Error: --judge api requires ANTHROPIC_API_KEY to be set.');
+      process.exit(1);
+    }
+    return new AnthropicLLMJudge(new Anthropic({ apiKey }));
+  }
+  if (mode === 'claude-cli') {
+    return new ClaudeCodeJudge();
+  }
+  console.error(`Error: unknown --judge mode "${mode}". Use "claude-cli" or "api".`);
+  process.exit(1);
+}
