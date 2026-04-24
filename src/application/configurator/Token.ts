@@ -7,7 +7,7 @@
  * module so callers never construct ad-hoc duplicates.
  */
 export class Token<T> {
-  readonly _phantom?: T;
+  declare readonly _phantom?: T;
 
   constructor(readonly description: string) {}
 }

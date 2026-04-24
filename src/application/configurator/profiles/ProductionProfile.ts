@@ -32,7 +32,7 @@ export type JudgeMode = 'api' | 'claude-cli';
 /** Options the CLI (or another entrypoint) passes to the production profile. */
 export interface ProductionProfileOptions {
   readonly judge: JudgeMode;
-  /** Absolute path where `.quatermaster/history` lives. */
+  /** Directory where `.quatermaster/history` lives. May be absolute or relative to cwd. */
   readonly historyDir: string;
   /** When true, also binds the workspace-backed agent runner. */
   readonly enableWorkspace?: boolean;
