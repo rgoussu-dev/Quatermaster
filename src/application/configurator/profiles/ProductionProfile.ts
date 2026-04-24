@@ -12,6 +12,7 @@ import { FileSystemScanner } from '../../../infrastructure/project-scanner/real/
 import { ClaudeCodeSkillJudge } from '../../../infrastructure/skill-judge/claude-cli/ClaudeCodeSkillJudge.js';
 import { AnthropicSkillJudge } from '../../../infrastructure/skill-judge/real/AnthropicSkillJudge.js';
 import { ClaudeCodeSkillRunner } from '../../../infrastructure/skill-runner/real/ClaudeCodeSkillRunner.js';
+import { ConfigurationError } from '../ConfigurationError.js';
 import type { Container } from '../Container.js';
 import {
   AgentRunWorkspaceToken,
@@ -51,7 +52,7 @@ export function applyProductionProfile(
   container.bind(AnthropicClientToken, () => {
     const apiKey = process.env['ANTHROPIC_API_KEY'];
     if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY is required for --judge api.');
+      throw new ConfigurationError('ANTHROPIC_API_KEY is required for --judge api.');
     }
     return new Anthropic({ apiKey });
   });
