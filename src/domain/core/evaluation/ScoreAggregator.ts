@@ -83,39 +83,66 @@ export function overallScore(dimensions: readonly DimensionScore[]): {
  */
 const OBSERVATION_SOURCES: ReadonlySet<string> = new Set(['llm-judge']);
 
+const SEVERITY_RANK: Record<Finding['severity'], number> = {
+  critical: 2,
+  warning: 1,
+  info: 0,
+};
+
 /**
  * Extracts actionable recommendations across dimensions. Filters out
- * neutral LLM observations, dedupes by normalised description, and within
- * each severity bucket prefers findings from higher-weighted dimensions.
+ * neutral LLM observations, dedupes by normalised description keeping the
+ * best (highest-severity, then highest-weight) occurrence, and within each
+ * severity bucket prefers findings from higher-weighted dimensions.
  */
 export function topRecommendations(dimensions: readonly DimensionScore[], limit = 5): string[] {
-  const buckets: Record<Finding['severity'], { text: string; weight: number }[]> = {
-    critical: [],
-    warning: [],
-    info: [],
-  };
-  const seen = new Set<string>();
+  interface Candidate {
+    readonly text: string;
+    readonly severity: Finding['severity'];
+    readonly weight: number;
+  }
+
+  const best = new Map<string, Candidate>();
 
   for (const dim of dimensions) {
     for (const f of dim.findings) {
       if (OBSERVATION_SOURCES.has(f.source)) continue;
       const key = normaliseKey(f.description);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      buckets[f.severity].push({
+      const candidate: Candidate = {
         text: `[${dim.dimension}] ${f.description}`,
+        severity: f.severity,
         weight: dim.weight,
-      });
+      };
+      const current = best.get(key);
+      if (current === undefined || outranks(candidate, current)) {
+        best.set(key, candidate);
+      }
     }
   }
 
+  const buckets: Record<Finding['severity'], Candidate[]> = {
+    critical: [],
+    warning: [],
+    info: [],
+  };
+  for (const c of best.values()) buckets[c.severity].push(c);
   for (const sev of ['critical', 'warning', 'info'] as const) {
     buckets[sev].sort((a, b) => b.weight - a.weight);
   }
 
   return [...buckets.critical, ...buckets.warning, ...buckets.info]
     .slice(0, limit)
-    .map((b) => b.text);
+    .map((c) => c.text);
+}
+
+function outranks(
+  a: { severity: Finding['severity']; weight: number },
+  b: { severity: Finding['severity']; weight: number },
+): boolean {
+  if (SEVERITY_RANK[a.severity] !== SEVERITY_RANK[b.severity]) {
+    return SEVERITY_RANK[a.severity] > SEVERITY_RANK[b.severity];
+  }
+  return a.weight > b.weight;
 }
 
 function normaliseKey(description: string): string {

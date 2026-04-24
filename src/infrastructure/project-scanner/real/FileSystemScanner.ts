@@ -1,5 +1,5 @@
 import { readFile, access, readdir, stat } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { glob } from 'glob';
 import type { ProjectScanner } from '../../../domain/contract/ports/ProjectScanner.js';
 import type { ProjectSnapshot } from '../../../domain/contract/ProjectSnapshot.js';
@@ -131,7 +131,10 @@ export class FileSystemScanner implements ProjectScanner {
     ]);
 
     const resolvedClaudeMd = claudeMd ?? altClaudeMd;
+    const claudeMdSourcePath = claudeMd !== null ? 'CLAUDE.md' : '.claude/CLAUDE.md';
     const contributingMd = contributingRoot ?? contributingDocs;
+    const contributingSourcePath =
+      contributingRoot !== null ? 'CONTRIBUTING.md' : 'docs/CONTRIBUTING.md';
 
     const testFilePaths = (
       await glob(TEST_GLOBS, { cwd: projectPath, ignore: ['node_modules/**'] })
@@ -181,12 +184,12 @@ export class FileSystemScanner implements ProjectScanner {
       sourceFilePaths,
     );
 
-    const brokenDocLinks = await computeBrokenDocLinks(projectPath, {
-      'README.md': readmeMd,
-      'CLAUDE.md': resolvedClaudeMd,
-      'AGENTS.md': agentsMd,
-      'CONTRIBUTING.md': contributingMd,
-    });
+    const brokenDocLinks = await computeBrokenDocLinks(projectPath, [
+      { source: 'README.md', content: readmeMd },
+      { source: claudeMdSourcePath, content: resolvedClaudeMd },
+      { source: 'AGENTS.md', content: agentsMd },
+      { source: contributingSourcePath, content: contributingMd },
+    ]);
 
     return {
       projectPath,
@@ -282,30 +285,34 @@ async function computeExportedDocCoverage(
   return { documented, total };
 }
 
-const MD_LINK_RE = /(!?)\[([^\]]*)\]\(([^)]+)\)/g;
+const MD_LINK_PATTERN = '(!?)\\[([^\\]]*)\\]\\(([^)]+)\\)';
 
 async function computeBrokenDocLinks(
   projectPath: string,
-  docs: Record<string, string | null>,
+  docs: readonly { source: string; content: string | null }[],
 ): Promise<{ source: string; target: string }[]> {
   const broken: { source: string; target: string }[] = [];
-  for (const [source, content] of Object.entries(docs)) {
+  const linkRe = new RegExp(MD_LINK_PATTERN, 'g');
+  for (const { source, content } of docs) {
     if (content === null) continue;
+    const baseDir = dirname(source);
     const seen = new Set<string>();
     let match: RegExpExecArray | null;
-    MD_LINK_RE.lastIndex = 0;
-    while ((match = MD_LINK_RE.exec(content)) !== null) {
+    linkRe.lastIndex = 0;
+    while ((match = linkRe.exec(content)) !== null) {
       const rawTarget = match[3];
       if (rawTarget === undefined) continue;
       const target = rawTarget.trim();
       if (target === '' || /^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('#')) continue;
-      if (target.startsWith('mailto:')) continue;
       const withoutFragment = target.split('#')[0];
       if (withoutFragment === undefined || withoutFragment === '') continue;
       if (seen.has(withoutFragment)) continue;
       seen.add(withoutFragment);
+      const resolved = withoutFragment.startsWith('/')
+        ? join(projectPath, withoutFragment)
+        : join(projectPath, baseDir, withoutFragment);
       try {
-        await access(join(projectPath, withoutFragment));
+        await access(resolved);
       } catch {
         broken.push({ source, target: withoutFragment });
       }

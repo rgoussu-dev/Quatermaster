@@ -55,6 +55,50 @@ describe('topRecommendations', () => {
     expect(recs[0]).toContain('Add diagrams');
   });
 
+  it('keeps the highest-severity occurrence when the same description appears twice', () => {
+    const dims = [
+      dim('documentation', 0.15, [
+        {
+          description: 'Same issue.',
+          severity: 'info',
+          source: 'rule-a',
+        },
+      ]),
+      dim('claude-code-setup', 0.35, [
+        {
+          description: 'Same issue.',
+          severity: 'critical',
+          source: 'rule-b',
+        },
+      ]),
+    ];
+    const recs = topRecommendations(dims);
+    expect(recs).toHaveLength(1);
+    expect(recs[0]).toContain('claude-code-setup');
+  });
+
+  it('breaks severity ties by higher dimension weight', () => {
+    const dims = [
+      dim('documentation', 0.15, [
+        {
+          description: 'Same issue.',
+          severity: 'warning',
+          source: 'rule-a',
+        },
+      ]),
+      dim('claude-code-setup', 0.35, [
+        {
+          description: 'Same issue.',
+          severity: 'warning',
+          source: 'rule-b',
+        },
+      ]),
+    ];
+    const recs = topRecommendations(dims);
+    expect(recs).toHaveLength(1);
+    expect(recs[0]).toContain('claude-code-setup');
+  });
+
   it('dedupes findings with the same description across dimensions', () => {
     const dims = [
       dim('claude-code-setup', 0.35, [

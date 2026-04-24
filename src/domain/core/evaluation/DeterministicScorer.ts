@@ -217,7 +217,8 @@ function scoreDocumentation(snapshot: ProjectSnapshot): DimensionAssessment {
     });
   }
 
-  // CLAUDE.md: small weight here — most of it is scored under claude-code-setup (15 pts).
+  // CLAUDE.md: up to 20 pts here (5 presence + up to 15 graded quality).
+  // Most of the CLAUDE.md signal is already counted under claude-code-setup.
   if (snapshot.claudeMd !== null) {
     pts += 5;
     pts += scoreClaudeMdQuality(snapshot.claudeMd, findings);
