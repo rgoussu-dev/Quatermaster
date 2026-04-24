@@ -17,10 +17,12 @@ export function wellConfiguredSnapshot(): ProjectSnapshot {
   return {
     projectPath: '/test/well-configured',
     claudeMd:
-      `# Project\n\nThis project uses hexagonal architecture with ports and adapters.\nAll business logic lives in domain/core. Tests use the Scenario+Factory+fakes pattern.\nCommit via trunk-based development with Conventional Commits.`.repeat(
+      `# Project\n\nThis project uses hexagonal architecture with ports and adapters.\nAll business logic lives in domain/core. Tests use the Scenario+Factory+fakes pattern.\nCommit via trunk-based development with Conventional Commits.\n\nRun \`npm test\` and \`npm run build\`.`.repeat(
         2,
       ),
-    readmeMd: `# My Project\n\nA well-documented project.\n\n## Build\n\n\`npm run build\`\n\n## Test\n\n\`npm test\`\n\n## Architecture\n\nHexagonal architecture with domain, application, and infrastructure layers.`,
+    readmeMd: `# My Project\n\nA well-documented project.\n\n## Install\n\n\`\`\`sh\nnpm install\n\`\`\`\n\n## Usage\n\n\`\`\`ts\nimport { api } from './src/index.js';\napi();\n\`\`\`\n\n## Build\n\n\`npm run build\`\n\n## Test\n\n\`npm test\`\n\n## Architecture\n\nHexagonal architecture with domain, application, and infrastructure layers.`,
+    contributingMd: `# Contributing\n\nPlease open an issue before large changes.`,
+    agentsMd: null,
     directoryTree: BASE_TREE + '\ntests/\n  evaluation/\n.github/\n  workflows/',
     testFilePaths: [
       'tests/evaluation/EvaluateProjectScenario.ts',
@@ -51,6 +53,8 @@ export function wellConfiguredSnapshot(): ProjectSnapshot {
         content: `/**\n * Secondary port — reads a project and returns a snapshot.\n */\nexport interface ProjectScanner {\n  scan(projectPath: string): Promise<ProjectSnapshot>;\n}\n`,
       },
     ],
+    exportedSymbolDocCoverage: { documented: 18, total: 20 },
+    brokenDocLinks: [],
     hasLockfile: true,
     ciConfigPaths: ['.github/workflows/ci.yml'],
   };
@@ -62,6 +66,8 @@ export function minimalSnapshot(): ProjectSnapshot {
     projectPath: '/test/minimal',
     claudeMd: null,
     readmeMd: null,
+    contributingMd: null,
+    agentsMd: null,
     directoryTree: 'src/\n  index.ts',
     testFilePaths: [],
     testFileSamples: [],
@@ -69,6 +75,8 @@ export function minimalSnapshot(): ProjectSnapshot {
     claudeSettingsJson: null,
     sourceFilePaths: ['src/index.ts'],
     sourceFileSamples: [],
+    exportedSymbolDocCoverage: null,
+    brokenDocLinks: [],
     hasLockfile: false,
     ciConfigPaths: [],
   };

@@ -21,6 +21,8 @@ const EMPTY_SNAPSHOT: ProjectSnapshot = {
   projectPath: '',
   claudeMd: null,
   readmeMd: null,
+  contributingMd: null,
+  agentsMd: null,
   directoryTree: '',
   testFilePaths: [],
   testFileSamples: [],
@@ -28,6 +30,8 @@ const EMPTY_SNAPSHOT: ProjectSnapshot = {
   claudeSettingsJson: null,
   sourceFilePaths: [],
   sourceFileSamples: [],
+  exportedSymbolDocCoverage: null,
+  brokenDocLinks: [],
   hasLockfile: false,
   ciConfigPaths: [],
 };

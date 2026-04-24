@@ -205,8 +205,10 @@ function scoreDocumentation(snapshot: ProjectSnapshot): DimensionAssessment {
   const findings: Finding[] = [];
   let pts = 0;
 
+  // README presence + graded structural quality (35 pts).
   if (snapshot.readmeMd !== null) {
-    pts += 25;
+    pts += 10;
+    pts += scoreReadmeStructure(snapshot.readmeMd, findings);
   } else {
     findings.push({
       description: 'No README.md found.',
@@ -215,24 +217,30 @@ function scoreDocumentation(snapshot: ProjectSnapshot): DimensionAssessment {
     });
   }
 
-  if (snapshot.readmeMd !== null && snapshot.readmeMd.length > 300) {
-    pts += 20;
-  } else if (snapshot.readmeMd !== null) {
+  // CLAUDE.md: up to 20 pts here (5 presence + up to 15 graded quality).
+  // Most of the CLAUDE.md signal is already counted under claude-code-setup.
+  if (snapshot.claudeMd !== null) {
+    pts += 5;
+    pts += scoreClaudeMdQuality(snapshot.claudeMd, findings);
+  }
+
+  // Contributor-oriented onboarding doc (15 pts).
+  if (snapshot.agentsMd !== null || snapshot.contributingMd !== null) {
+    pts += 15;
+  } else {
     findings.push({
-      description: 'README.md is too short. Add build instructions and architecture overview.',
+      description:
+        'No AGENTS.md or CONTRIBUTING.md found. Add contributor-oriented onboarding so agents can ramp up safely.',
       severity: 'warning',
-      source: 'thin-readme',
+      source: 'no-contributor-doc',
     });
   }
 
-  if (snapshot.claudeMd !== null) {
-    pts += 20;
-  }
-
+  // docs/ or adr/ directory (15 pts).
   const hasDocsDir =
     /\bdocs[/\\]/.test(snapshot.directoryTree) || /\badr[/\\]/.test(snapshot.directoryTree);
   if (hasDocsDir) {
-    pts += 20;
+    pts += 15;
   } else {
     findings.push({
       description: 'No docs/ or adr/ directory found.',
@@ -241,18 +249,162 @@ function scoreDocumentation(snapshot: ProjectSnapshot): DimensionAssessment {
     });
   }
 
-  const hasDocComments = snapshot.sourceFileSamples.some(
-    (s) => s.content.includes('/**') || s.content.includes('///'),
-  );
-  if (hasDocComments) {
-    pts += 15;
-  } else {
+  // TSDoc coverage over exported symbols (up to 20 pts).
+  pts += scoreTsdocCoverage(snapshot.exportedSymbolDocCoverage, findings);
+
+  // Broken relative links in README/CLAUDE/AGENTS/CONTRIBUTING (penalty, capped).
+  if (snapshot.brokenDocLinks.length > 0) {
+    const penalty = Math.min(snapshot.brokenDocLinks.length * 5, 15);
+    pts -= penalty;
+    const preview = snapshot.brokenDocLinks
+      .slice(0, 3)
+      .map((l) => `${l.source} → ${l.target}`)
+      .join('; ');
+    const more =
+      snapshot.brokenDocLinks.length > 3 ? ` (+${snapshot.brokenDocLinks.length - 3} more)` : '';
     findings.push({
-      description: 'No doc comments (/** */ or ///) found in sampled source files.',
+      description: `Broken relative links in project docs: ${preview}${more}. Fix or remove stale paths.`,
       severity: 'warning',
-      source: 'no-doc-comments',
+      source: 'broken-doc-links',
     });
   }
 
-  return { score: Math.min(pts, 100), findings };
+  return { score: Math.max(0, Math.min(pts, 100)), findings };
+}
+
+const README_H2_RE = /^##\s+\S/m;
+const README_FENCE_RE = /```[a-zA-Z0-9_+-]*\n/;
+const README_INSTALL_RE = /^##\s+(install|installation|setup|getting started|quick ?start)/im;
+const README_USAGE_RE = /^##\s+(usage|example|examples|how to use|api)/im;
+
+function scoreReadmeStructure(readme: string, findings: Finding[]): number {
+  let pts = 0;
+
+  if (readme.length > 300) {
+    pts += 5;
+  } else {
+    findings.push({
+      description:
+        'README.md is very short (<300 chars). Add build, usage, and architecture sections.',
+      severity: 'warning',
+      source: 'thin-readme',
+    });
+  }
+
+  if (README_FENCE_RE.test(readme)) {
+    pts += 5;
+  } else {
+    findings.push({
+      description:
+        'README.md has no fenced code block. Add runnable examples so agents can copy them.',
+      severity: 'warning',
+      source: 'readme-no-code-fence',
+    });
+  }
+
+  const headingCount = (readme.match(/^##\s+\S/gm) ?? []).length;
+  if (headingCount >= 2 && README_H2_RE.test(readme)) {
+    pts += 5;
+  } else {
+    findings.push({
+      description:
+        'README.md has fewer than two top-level sections. Break it into navigable sections.',
+      severity: 'info',
+      source: 'readme-thin-structure',
+    });
+  }
+
+  if (README_INSTALL_RE.test(readme)) {
+    pts += 5;
+  } else {
+    findings.push({
+      description: 'README.md has no Install / Setup / Getting Started section.',
+      severity: 'info',
+      source: 'readme-no-install-section',
+    });
+  }
+
+  if (README_USAGE_RE.test(readme)) {
+    pts += 5;
+  } else {
+    findings.push({
+      description: 'README.md has no Usage / Examples section.',
+      severity: 'info',
+      source: 'readme-no-usage-section',
+    });
+  }
+
+  return pts;
+}
+
+const CLAUDE_COMMAND_RE =
+  /```(?:sh|bash|zsh|shell|console)?\s*\n|\bnpm\s+(?:run|test|install)\b|\byarn\s+\w+|\bpnpm\s+\w+/i;
+const CLAUDE_ARCH_RE =
+  /architecture|hexagonal|ports?\s+and\s+adapters?|layer|directory|convention/i;
+
+function scoreClaudeMdQuality(claudeMd: string, findings: Finding[]): number {
+  let pts = 0;
+
+  if (claudeMd.length > 200) {
+    pts += 5;
+  } else {
+    findings.push({
+      description:
+        'CLAUDE.md is very short (<200 chars). Expand it with architecture, conventions, and workflow instructions.',
+      severity: 'warning',
+      source: 'claude-md-thin',
+    });
+    return pts;
+  }
+
+  if (CLAUDE_COMMAND_RE.test(claudeMd)) {
+    pts += 5;
+  } else {
+    findings.push({
+      description:
+        'CLAUDE.md does not mention project commands. Document build/test/lint commands.',
+      severity: 'info',
+      source: 'claude-md-no-commands',
+    });
+  }
+
+  if (CLAUDE_ARCH_RE.test(claudeMd)) {
+    pts += 5;
+  } else {
+    findings.push({
+      description:
+        'CLAUDE.md does not describe architecture or conventions. Explain how the codebase is organised.',
+      severity: 'info',
+      source: 'claude-md-no-architecture',
+    });
+  }
+
+  return pts;
+}
+
+function scoreTsdocCoverage(
+  coverage: ProjectSnapshot['exportedSymbolDocCoverage'],
+  findings: Finding[],
+): number {
+  if (coverage === null) return 0;
+  if (coverage.total === 0) return 0;
+
+  const ratio = coverage.documented / coverage.total;
+  const pts = Math.round(ratio * 20);
+
+  if (ratio < 0.3) {
+    findings.push({
+      description: `Only ${coverage.documented}/${coverage.total} exported symbols have TSDoc. Document public surfaces.`,
+      severity: 'warning',
+      source: 'low-tsdoc-coverage',
+    });
+  } else if (ratio < 0.6) {
+    findings.push({
+      description: `TSDoc coverage is ${coverage.documented}/${coverage.total}. Aim for ≥60% on exported symbols.`,
+      severity: 'info',
+      source: 'partial-tsdoc-coverage',
+    });
+  }
+
+  return pts;
 }

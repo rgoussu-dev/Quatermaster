@@ -9,6 +9,10 @@ export interface ProjectSnapshot {
   readonly claudeMd: string | null;
   /** Content of top-level README.md, or null if absent. */
   readonly readmeMd: string | null;
+  /** Content of CONTRIBUTING.md (root or docs/), or null if absent. */
+  readonly contributingMd: string | null;
+  /** Content of AGENTS.md at project root, or null if absent. */
+  readonly agentsMd: string | null;
   /** Compact directory tree listing, depth-limited to 4 levels, max 200 lines. */
   readonly directoryTree: string;
   /** Test file paths relative to the project root, capped at 50. */
@@ -23,6 +27,21 @@ export interface ProjectSnapshot {
   readonly sourceFilePaths: readonly string[];
   /** Sampled source file content (first 5 files under src/ or lib/, first 100 lines each). */
   readonly sourceFileSamples: readonly { path: string; content: string }[];
+  /**
+   * Ratio of exported TypeScript symbols that carry an adjacent TSDoc
+   * comment (`/** ... *\/`), computed corpus-wide over `src/` and `lib/`.
+   * Null when the scanner did not analyse exports (e.g. non-TS project).
+   */
+  readonly exportedSymbolDocCoverage: {
+    readonly documented: number;
+    readonly total: number;
+  } | null;
+  /**
+   * Relative links from README.md / CLAUDE.md / AGENTS.md / CONTRIBUTING.md
+   * whose target file does not exist in the project. Absolute URLs and
+   * anchor-only links (`#heading`) are not included.
+   */
+  readonly brokenDocLinks: readonly { source: string; target: string }[];
   /** True if a lockfile exists (package-lock.json, Cargo.lock, poetry.lock, etc.). */
   readonly hasLockfile: boolean;
   /** Paths of CI config files (.github/workflows/, .gitlab-ci.yml, etc.). */
