@@ -1,36 +1,20 @@
 import { program } from 'commander';
-import Anthropic from '@anthropic-ai/sdk';
 import { join, resolve } from 'node:path';
-import { Mediator } from '../../../domain/contract/kernel/Mediator.js';
 import { EvaluateProject } from '../../../domain/core/evaluation/EvaluateProject.js';
-import { EvaluateProjectHandler } from '../../../domain/core/evaluation/EvaluateProjectHandler.js';
 import { toProjectHistorySnapshot } from '../../../domain/core/evaluation/toProjectHistorySnapshot.js';
 import { computeProjectEvaluationDelta } from '../../../domain/core/evaluation/computeProjectEvaluationDelta.js';
 import { EvaluateSkill } from '../../../domain/core/skill-evaluation/EvaluateSkill.js';
-import { EvaluateSkillHandler } from '../../../domain/core/skill-evaluation/EvaluateSkillHandler.js';
 import { toHistorySnapshot } from '../../../domain/core/skill-evaluation/toHistorySnapshot.js';
 import { computeEvaluationDelta } from '../../../domain/core/skill-evaluation/computeEvaluationDelta.js';
-import { FileSystemScanner } from '../../../infrastructure/project-scanner/real/FileSystemScanner.js';
-import { AnthropicLLMJudge } from '../../../infrastructure/llm-judge/real/AnthropicLLMJudge.js';
-import { ClaudeCodeJudge } from '../../../infrastructure/llm-judge/claude-cli/ClaudeCodeJudge.js';
-import { ClaudeCodeSkillRunner } from '../../../infrastructure/skill-runner/real/ClaudeCodeSkillRunner.js';
-import { FileSystemAgentRunWorkspace } from '../../../infrastructure/agent-workspace/real/FileSystemAgentRunWorkspace.js';
-import { FileSystemDatasetLoader } from '../../../infrastructure/dataset-loader/real/FileSystemDatasetLoader.js';
 import {
-  FileSystemEvaluationHistoryStore,
   projectHistoryKey,
   skillHistoryKey,
 } from '../../../infrastructure/history-store/real/FileSystemEvaluationHistoryStore.js';
 import {
-  validateProjectSnapshot,
-  validateSkillSnapshot,
-} from '../../../infrastructure/history-store/real/snapshotSchemas.js';
-import { ClaudeCodeSkillJudge } from '../../../infrastructure/skill-judge/claude-cli/ClaudeCodeSkillJudge.js';
-import { AnthropicSkillJudge } from '../../../infrastructure/skill-judge/real/AnthropicSkillJudge.js';
-import type { EvaluationHistorySnapshot } from '../../../domain/contract/EvaluationHistorySnapshot.js';
-import type { ProjectHistorySnapshot } from '../../../domain/contract/ProjectHistorySnapshot.js';
-import type { LLMJudge } from '../../../domain/contract/ports/LLMJudge.js';
-import type { SkillJudge } from '../../../domain/contract/ports/SkillJudge.js';
+  bootstrapEvaluateProject,
+  bootstrapEvaluateSkill,
+  type JudgeMode,
+} from '../../configurator/index.js';
 import {
   printReport,
   printSkillReport,
@@ -59,20 +43,15 @@ program
   .option('--no-history', 'Skip loading and writing the per-run history snapshot.')
   .action(
     async (targetPath: string, opts: { judge: string; history: boolean; historyDir?: string }) => {
-      const judge = buildJudge(opts.judge);
       const projectPath = resolve(targetPath);
-      const scanner = new FileSystemScanner();
-      const handler = new EvaluateProjectHandler(scanner, judge);
-      const mediator = new Mediator([handler]);
+      const { mediator, history } = bootstrapEvaluateProject({
+        judge: parseJudgeMode(opts.judge),
+        historyDir: opts.historyDir ?? join(process.cwd(), '.quatermaster', 'history'),
+        history: opts.history,
+      });
 
-      const historyStore = opts.history
-        ? new FileSystemEvaluationHistoryStore<ProjectHistorySnapshot>(
-            opts.historyDir ?? join(process.cwd(), '.quatermaster', 'history'),
-            validateProjectSnapshot,
-          )
-        : null;
       const key = projectHistoryKey(projectPath);
-      const previous = historyStore ? await historyStore.loadLatest(key) : null;
+      const previous = history ? await history.loadLatest(key) : null;
 
       const result = await mediator.dispatch(new EvaluateProject(projectPath));
 
@@ -87,8 +66,8 @@ program
       if (previous) {
         printProjectDelta(computeProjectEvaluationDelta(previous, current));
       }
-      if (historyStore) {
-        await historyStore.save(key, current);
+      if (history) {
+        await history.save(key, current);
       }
     },
   );
@@ -131,23 +110,16 @@ program
     ) => {
       const resolvedSkillPath = resolve(skillPath);
       const resolvedDatasetPath = resolve(opts.dataset);
-      const skillJudge = buildSkillJudge(opts.judge);
-      const runner = new ClaudeCodeSkillRunner();
-      const loader = new FileSystemDatasetLoader();
-      const workspace = opts.workspace
-        ? new FileSystemAgentRunWorkspace({ keepWorkspace: opts.keepWorkspace })
-        : undefined;
-      const handler = new EvaluateSkillHandler(runner, loader, skillJudge, workspace);
-      const mediator = new Mediator([handler]);
+      const { mediator, history } = bootstrapEvaluateSkill({
+        judge: parseJudgeMode(opts.judge),
+        historyDir: opts.historyDir ?? join(process.cwd(), '.quatermaster', 'history'),
+        history: opts.history,
+        workspace: opts.workspace,
+        keepWorkspace: opts.keepWorkspace,
+      });
 
-      const historyStore = opts.history
-        ? new FileSystemEvaluationHistoryStore<EvaluationHistorySnapshot>(
-            opts.historyDir ?? join(process.cwd(), '.quatermaster', 'history'),
-            validateSkillSnapshot,
-          )
-        : null;
       const key = skillHistoryKey(resolvedSkillPath, resolvedDatasetPath);
-      const previous = historyStore ? await historyStore.loadLatest(key) : null;
+      const previous = history ? await history.loadLatest(key) : null;
 
       const result = await mediator.dispatch(
         new EvaluateSkill(resolvedSkillPath, resolvedDatasetPath),
@@ -164,42 +136,16 @@ program
       if (previous) {
         printSkillDelta(computeEvaluationDelta(previous, current));
       }
-      if (historyStore) {
-        await historyStore.save(key, current);
+      if (history) {
+        await history.save(key, current);
       }
     },
   );
 
 program.parse();
 
-function buildSkillJudge(mode: string): SkillJudge {
-  if (mode === 'api') {
-    const apiKey = process.env['ANTHROPIC_API_KEY'];
-    if (!apiKey) {
-      console.error('Error: --judge api requires ANTHROPIC_API_KEY to be set.');
-      process.exit(1);
-    }
-    return new AnthropicSkillJudge(new Anthropic({ apiKey }));
-  }
-  if (mode === 'claude-cli') {
-    return new ClaudeCodeSkillJudge();
-  }
-  console.error(`Error: unknown --judge mode "${mode}". Use "claude-cli" or "api".`);
-  process.exit(1);
-}
-
-function buildJudge(mode: string): LLMJudge {
-  if (mode === 'api') {
-    const apiKey = process.env['ANTHROPIC_API_KEY'];
-    if (!apiKey) {
-      console.error('Error: --judge api requires ANTHROPIC_API_KEY to be set.');
-      process.exit(1);
-    }
-    return new AnthropicLLMJudge(new Anthropic({ apiKey }));
-  }
-  if (mode === 'claude-cli') {
-    return new ClaudeCodeJudge();
-  }
+function parseJudgeMode(mode: string): JudgeMode {
+  if (mode === 'api' || mode === 'claude-cli') return mode;
   console.error(`Error: unknown --judge mode "${mode}". Use "claude-cli" or "api".`);
   process.exit(1);
 }
