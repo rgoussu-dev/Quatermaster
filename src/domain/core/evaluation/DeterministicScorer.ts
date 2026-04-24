@@ -259,7 +259,8 @@ function scoreDocumentation(snapshot: ProjectSnapshot): DimensionAssessment {
       .slice(0, 3)
       .map((l) => `${l.source} → ${l.target}`)
       .join('; ');
-    const more = snapshot.brokenDocLinks.length > 3 ? ` (+${snapshot.brokenDocLinks.length - 3} more)` : '';
+    const more =
+      snapshot.brokenDocLinks.length > 3 ? ` (+${snapshot.brokenDocLinks.length - 3} more)` : '';
     findings.push({
       description: `Broken relative links in project docs: ${preview}${more}. Fix or remove stale paths.`,
       severity: 'warning',
@@ -282,7 +283,8 @@ function scoreReadmeStructure(readme: string, findings: Finding[]): number {
     pts += 5;
   } else {
     findings.push({
-      description: 'README.md is very short (<300 chars). Add build, usage, and architecture sections.',
+      description:
+        'README.md is very short (<300 chars). Add build, usage, and architecture sections.',
       severity: 'warning',
       source: 'thin-readme',
     });
@@ -292,7 +294,8 @@ function scoreReadmeStructure(readme: string, findings: Finding[]): number {
     pts += 5;
   } else {
     findings.push({
-      description: 'README.md has no fenced code block. Add runnable examples so agents can copy them.',
+      description:
+        'README.md has no fenced code block. Add runnable examples so agents can copy them.',
       severity: 'warning',
       source: 'readme-no-code-fence',
     });
@@ -303,7 +306,8 @@ function scoreReadmeStructure(readme: string, findings: Finding[]): number {
     pts += 5;
   } else {
     findings.push({
-      description: 'README.md has fewer than two top-level sections. Break it into navigable sections.',
+      description:
+        'README.md has fewer than two top-level sections. Break it into navigable sections.',
       severity: 'info',
       source: 'readme-thin-structure',
     });
@@ -332,8 +336,10 @@ function scoreReadmeStructure(readme: string, findings: Finding[]): number {
   return pts;
 }
 
-const CLAUDE_COMMAND_RE = /```(?:sh|bash|zsh|shell|console)?\s*\n|\bnpm\s+(?:run|test|install)\b|\byarn\s+\w+|\bpnpm\s+\w+/i;
-const CLAUDE_ARCH_RE = /architecture|hexagonal|ports?\s+and\s+adapters?|layer|directory|convention/i;
+const CLAUDE_COMMAND_RE =
+  /```(?:sh|bash|zsh|shell|console)?\s*\n|\bnpm\s+(?:run|test|install)\b|\byarn\s+\w+|\bpnpm\s+\w+/i;
+const CLAUDE_ARCH_RE =
+  /architecture|hexagonal|ports?\s+and\s+adapters?|layer|directory|convention/i;
 
 function scoreClaudeMdQuality(claudeMd: string, findings: Finding[]): number {
   let pts = 0;
@@ -354,7 +360,8 @@ function scoreClaudeMdQuality(claudeMd: string, findings: Finding[]): number {
     pts += 5;
   } else {
     findings.push({
-      description: 'CLAUDE.md does not mention project commands. Document build/test/lint commands.',
+      description:
+        'CLAUDE.md does not mention project commands. Document build/test/lint commands.',
       severity: 'info',
       source: 'claude-md-no-commands',
     });

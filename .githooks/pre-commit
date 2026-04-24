@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Git pre-commit hook — enforces format + tests before every commit.
+# Activated by `npm install` (see the `prepare` script in package.json),
+# which sets `git config core.hooksPath .githooks` for this repo.
+#
+# Skip with `git commit --no-verify` when intentional; prefer fixing the
+# underlying issue.
+
+set -u
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+if ! npm run --silent format:check; then
+  echo "pre-commit: prettier check failed — run 'npm run format' to fix." >&2
+  exit 1
+fi
+
+if ! npm test --silent -- --run >/dev/null 2>&1; then
+  echo "pre-commit: tests failed — run 'npm test' and fix before committing." >&2
+  exit 1
+fi
+
+exit 0

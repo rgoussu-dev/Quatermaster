@@ -124,15 +124,15 @@ describe('scoreDocumentation', () => {
     });
 
     it('flags partial coverage between 30% and 60%', () => {
-      expect(
-        findingSources({ exportedSymbolDocCoverage: { documented: 4, total: 10 } }),
-      ).toContain('partial-tsdoc-coverage');
+      expect(findingSources({ exportedSymbolDocCoverage: { documented: 4, total: 10 } })).toContain(
+        'partial-tsdoc-coverage',
+      );
     });
 
     it('flags low coverage below 30%', () => {
-      expect(
-        findingSources({ exportedSymbolDocCoverage: { documented: 1, total: 10 } }),
-      ).toContain('low-tsdoc-coverage');
+      expect(findingSources({ exportedSymbolDocCoverage: { documented: 1, total: 10 } })).toContain(
+        'low-tsdoc-coverage',
+      );
     });
 
     it('awards points proportionally to the coverage ratio', () => {

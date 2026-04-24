@@ -176,7 +176,10 @@ export class FileSystemScanner implements ProjectScanner {
 
     const ciConfigPaths = await collectCIConfigs(projectPath);
 
-    const exportedSymbolDocCoverage = await computeExportedDocCoverage(projectPath, sourceFilePaths);
+    const exportedSymbolDocCoverage = await computeExportedDocCoverage(
+      projectPath,
+      sourceFilePaths,
+    );
 
     const brokenDocLinks = await computeBrokenDocLinks(projectPath, {
       'README.md': readmeMd,
