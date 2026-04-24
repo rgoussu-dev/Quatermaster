@@ -76,7 +76,7 @@ export function buildWorkspaceMediator(
   const datasets = new Map([[DATASET_PATH, dataset]]);
 
   const container = buildTestContainer();
-  container.bind(AgentRunWorkspaceToken, () => new InMemoryAgentRunWorkspace(outcomes));
+  container.rebind(AgentRunWorkspaceToken, () => new InMemoryAgentRunWorkspace(outcomes));
   container.rebindValue(SkillRunnerToken, new InMemorySkillRunner());
   container.rebindValue(DatasetLoaderToken, new InMemoryDatasetLoader(datasets));
 
