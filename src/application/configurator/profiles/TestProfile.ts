@@ -1,4 +1,3 @@
-import { InMemoryAgentRunWorkspace } from '../../../infrastructure/agent-workspace/fake/InMemoryAgentRunWorkspace.js';
 import { InMemoryDatasetLoader } from '../../../infrastructure/dataset-loader/fake/InMemoryDatasetLoader.js';
 import { InMemoryEvaluationHistoryStore } from '../../../infrastructure/history-store/fake/InMemoryEvaluationHistoryStore.js';
 import { StubLLMJudge } from '../../../infrastructure/llm-judge/fake/StubLLMJudge.js';
@@ -34,9 +33,11 @@ const EMPTY_SNAPSHOT: ProjectSnapshot = {
 };
 
 /**
- * Binds fakes for every port. Tests use `rebind*` on the returned container
- * to replace individual bindings (e.g. preload the scanner with a curated
- * snapshot or swap in a routing judge).
+ * Binds fakes for the standard test ports. The optional `AgentRunWorkspaceToken`
+ * is intentionally left unbound — tests that exercise the workspace-backed
+ * skill path bind it themselves via `rebind` so the handler picks it up
+ * through `Container.tryResolve`. Tests `rebind*` the other ports as needed
+ * (e.g. preload the scanner with a curated snapshot or swap in a routing judge).
  */
 export function applyTestProfile(container: Container): void {
   container.bind(ProjectScannerToken, () => new InMemoryProjectScanner(EMPTY_SNAPSHOT));
