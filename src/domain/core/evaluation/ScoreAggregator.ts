@@ -76,20 +76,52 @@ export function overallScore(dimensions: readonly DimensionScore[]): {
   return { score: s, grade: toGrade(s) };
 }
 
-/** Picks top recommendations by severity from across all dimensions. */
+/**
+ * Finding sources that represent neutral/positive LLM observations rather
+ * than actionable recommendations. Excluded from `topRecommendations` so
+ * praise like "CLAUDE.md is comprehensive" doesn't crowd out real fixes.
+ */
+const OBSERVATION_SOURCES: ReadonlySet<string> = new Set(['llm-judge']);
+
+/**
+ * Extracts actionable recommendations across dimensions. Filters out
+ * neutral LLM observations, dedupes by normalised description, and within
+ * each severity bucket prefers findings from higher-weighted dimensions.
+ */
 export function topRecommendations(dimensions: readonly DimensionScore[], limit = 5): string[] {
-  const criticals: string[] = [];
-  const warnings: string[] = [];
-  const infos: string[] = [];
+  const buckets: Record<Finding['severity'], { text: string; weight: number }[]> = {
+    critical: [],
+    warning: [],
+    info: [],
+  };
+  const seen = new Set<string>();
 
   for (const dim of dimensions) {
     for (const f of dim.findings) {
-      const prefixed = `[${dim.dimension}] ${f.description}`;
-      if (f.severity === 'critical') criticals.push(prefixed);
-      else if (f.severity === 'warning') warnings.push(prefixed);
-      else infos.push(prefixed);
+      if (OBSERVATION_SOURCES.has(f.source)) continue;
+      const key = normaliseKey(f.description);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      buckets[f.severity].push({
+        text: `[${dim.dimension}] ${f.description}`,
+        weight: dim.weight,
+      });
     }
   }
 
-  return [...criticals, ...warnings, ...infos].slice(0, limit);
+  for (const sev of ['critical', 'warning', 'info'] as const) {
+    buckets[sev].sort((a, b) => b.weight - a.weight);
+  }
+
+  return [...buckets.critical, ...buckets.warning, ...buckets.info]
+    .slice(0, limit)
+    .map((b) => b.text);
+}
+
+function normaliseKey(description: string): string {
+  return description
+    .toLowerCase()
+    .replace(/[.,;:!?()'"`]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
