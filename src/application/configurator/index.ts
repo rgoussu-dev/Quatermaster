@@ -1,5 +1,6 @@
 export { Container } from './Container.js';
 export type { Resolver } from './Container.js';
+export { ConfigurationError } from './ConfigurationError.js';
 export { Token, token } from './Token.js';
 export * from './tokens.js';
 export { applyEvaluationModule } from './modules/EvaluationModule.js';

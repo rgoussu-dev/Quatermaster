@@ -13,6 +13,9 @@ import {
 import {
   bootstrapEvaluateProject,
   bootstrapEvaluateSkill,
+  ConfigurationError,
+  type EvaluateProjectBootstrap,
+  type EvaluateSkillBootstrap,
   type JudgeMode,
 } from '../../configurator/index.js';
 import {
@@ -44,11 +47,14 @@ program
   .action(
     async (targetPath: string, opts: { judge: string; history: boolean; historyDir?: string }) => {
       const projectPath = resolve(targetPath);
-      const { mediator, history } = bootstrapEvaluateProject({
-        judge: parseJudgeMode(opts.judge),
-        historyDir: opts.historyDir ?? join(process.cwd(), '.quatermaster', 'history'),
-        history: opts.history,
-      });
+      const bootstrap = runBootstrap(() =>
+        bootstrapEvaluateProject({
+          judge: parseJudgeMode(opts.judge),
+          historyDir: opts.historyDir ?? join(process.cwd(), '.quatermaster', 'history'),
+          history: opts.history,
+        }),
+      );
+      const { mediator, history } = bootstrap;
 
       const key = projectHistoryKey(projectPath);
       const previous = history ? await history.loadLatest(key) : null;
@@ -110,13 +116,16 @@ program
     ) => {
       const resolvedSkillPath = resolve(skillPath);
       const resolvedDatasetPath = resolve(opts.dataset);
-      const { mediator, history } = bootstrapEvaluateSkill({
-        judge: parseJudgeMode(opts.judge),
-        historyDir: opts.historyDir ?? join(process.cwd(), '.quatermaster', 'history'),
-        history: opts.history,
-        workspace: opts.workspace,
-        keepWorkspace: opts.keepWorkspace,
-      });
+      const bootstrap = runBootstrap(() =>
+        bootstrapEvaluateSkill({
+          judge: parseJudgeMode(opts.judge),
+          historyDir: opts.historyDir ?? join(process.cwd(), '.quatermaster', 'history'),
+          history: opts.history,
+          workspace: opts.workspace,
+          keepWorkspace: opts.keepWorkspace,
+        }),
+      );
+      const { mediator, history } = bootstrap;
 
       const key = skillHistoryKey(resolvedSkillPath, resolvedDatasetPath);
       const previous = history ? await history.loadLatest(key) : null;
@@ -148,4 +157,23 @@ function parseJudgeMode(mode: string): JudgeMode {
   if (mode === 'api' || mode === 'claude-cli') return mode;
   console.error(`Error: unknown --judge mode "${mode}". Use "claude-cli" or "api".`);
   process.exit(1);
+}
+
+/**
+ * Runs a bootstrap call and turns any `ConfigurationError` into a clean
+ * non-zero exit with the user-facing message. Other errors bubble up so
+ * genuine programming bugs still produce a stack trace.
+ */
+function runBootstrap<T extends EvaluateProjectBootstrap | EvaluateSkillBootstrap>(
+  bootstrap: () => T,
+): T {
+  try {
+    return bootstrap();
+  } catch (err) {
+    if (err instanceof ConfigurationError) {
+      console.error(`Error: ${err.message}`);
+      process.exit(1);
+    }
+    throw err;
+  }
 }
