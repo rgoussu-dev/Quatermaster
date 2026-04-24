@@ -27,6 +27,18 @@ export function buildJudgeUserMessage(req: JudgeRequest): string {
   const readme = snapshot.readmeMd ? snapshot.readmeMd.slice(0, README_CAP) : '(not present)';
   const settings = redactSecrets(snapshot.claudeSettingsJson) ?? '(not present)';
   const claudeMd = snapshot.claudeMd ?? '(not present)';
+  const agentsMd = snapshot.agentsMd ? snapshot.agentsMd.slice(0, README_CAP) : '(not present)';
+  const contributingMd = snapshot.contributingMd
+    ? snapshot.contributingMd.slice(0, README_CAP)
+    : '(not present)';
+  const tsdocCoverage =
+    snapshot.exportedSymbolDocCoverage === null
+      ? '(not computed)'
+      : `${snapshot.exportedSymbolDocCoverage.documented}/${snapshot.exportedSymbolDocCoverage.total} exported symbols have TSDoc`;
+  const brokenLinks =
+    snapshot.brokenDocLinks.length === 0
+      ? '(none)'
+      : snapshot.brokenDocLinks.map((l) => `${l.source} → ${l.target}`).join('\n');
 
   const body = `Path: ${snapshot.projectPath}
 
@@ -35,6 +47,18 @@ ${claudeMd}
 
 README.md:
 ${readme}
+
+AGENTS.md:
+${agentsMd}
+
+CONTRIBUTING.md:
+${contributingMd}
+
+TSDOC COVERAGE:
+${tsdocCoverage}
+
+BROKEN DOC LINKS:
+${brokenLinks}
 
 DIRECTORY TREE:
 ${snapshot.directoryTree}

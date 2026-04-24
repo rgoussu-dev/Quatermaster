@@ -37,10 +37,12 @@ Evaluate the test infrastructure quality:
 `.trim();
 
 const RUBRIC_DOCUMENTATION = `
-Evaluate the documentation quality for agentic coding:
-- README Quality (40 pts): README.md present (+10), describes how to build and test (+15), describes the architecture (+15)
-- Public API Documentation (35 pts): exported types and interfaces documented (+20), port interfaces documented (+15)
-- Architecture Documentation (25 pts): docs/ or adr/ directory present (+15), CLAUDE.md or similar kept up to date (+10)
+Evaluate substantive documentation quality BEYOND what deterministic rules already
+measure. Do not re-score README/CLAUDE.md presence, fenced code blocks, section
+headings, TSDoc presence, or docs/ directory — those are counted elsewhere. Focus on:
+- Accuracy (35 pts): docs describe commands, architecture, and conventions that match the actual code (+20); no contradictory or outdated instructions (+15)
+- Depth (35 pts): TSDoc/JSDoc on exported surfaces explains invariants, trade-offs, and error modes — not just restating the signature (+20); module-level notes answer "why", not "what" (+15)
+- Agent-oriented clarity (30 pts): docs tell an agent how to contribute safely — commit style, test expectations, non-negotiable conventions (+15); examples are minimal and runnable, pointing at real files (+15)
 `.trim();
 
 /**
