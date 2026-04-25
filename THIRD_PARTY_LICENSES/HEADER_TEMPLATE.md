@@ -23,6 +23,10 @@ committed file.
 - **Type** — `Verbatim` or `Adapted`. (`Inspired` files do not require a
   header but should still get a one-line acknowledgment in their own
   README or a comment near the top.)
+- **Modifier copyright** — `<YYYY>` is the year of modification,
+  `<holder>` is whoever made the change (default for this repo: as
+  named in the root `LICENSE`), `<license>` is the license your
+  modification carries (typically the same as the repo).
 - **Modifications** — required for `Adapted`; bullet list of substantive
   deltas. Omit for `Verbatim`.
 
@@ -36,7 +40,7 @@ Adapted from citypaul/.dotfiles
   Original license: MIT — see THIRD_PARTY_LICENSES/citypaul-dotfiles.LICENSE
   Upstream commit:  <40-char SHA>
   Type:             Adapted
-Modifications © 2026 Romain Goussu, MIT.
+Modifications © <YYYY> <holder>, <license>.
 Changes from upstream:
   - <bullet>
   - <bullet>
@@ -55,7 +59,7 @@ For `Verbatim` files, use the same block but drop the `Modifications` /
 #   Original license: MIT — see THIRD_PARTY_LICENSES/citypaul-dotfiles.LICENSE
 #   Upstream commit:  <40-char SHA>
 #   Type:             Adapted
-# Modifications (c) 2026 Romain Goussu, MIT.
+# Modifications (c) <YYYY> <holder>, <license>.
 # Changes from upstream:
 #   - <bullet>
 #   - <bullet>
@@ -73,7 +77,7 @@ Place the block immediately after the shebang.
  *   Original license: MIT — see THIRD_PARTY_LICENSES/citypaul-dotfiles.LICENSE
  *   Upstream commit:  <40-char SHA>
  *   Type:             Adapted
- * Modifications (c) 2026 Romain Goussu, MIT.
+ * Modifications (c) <YYYY> <holder>, <license>.
  * Changes from upstream:
  *   - <bullet>
  *   - <bullet>
@@ -88,10 +92,10 @@ The block sits at the very top of the file, before any `import` statements.
 # Adapted from citypaul/.dotfiles
 #   Source:           https://github.com/citypaul/.dotfiles/blob/<sha>/<path>
 #   Original author:  Paul Hammond
-#   Original license: MIT - see THIRD_PARTY_LICENSES/citypaul-dotfiles.LICENSE
+#   Original license: MIT — see THIRD_PARTY_LICENSES/citypaul-dotfiles.LICENSE
 #   Upstream commit:  <40-char SHA>
 #   Type:             Adapted
-# Modifications (c) 2026 Romain Goussu, MIT.
+# Modifications (c) <YYYY> <holder>, <license>.
 # Changes from upstream:
 #   - <bullet>
 #   - <bullet>
