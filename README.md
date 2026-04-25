@@ -111,6 +111,17 @@ normalised). Weights can be overridden per case via `metricWeights`.
 
 See `plan.md` and `measure-the-immeasurable.md` for the conceptual frame.
 
+## Acknowledgments
+
+Quatermaster's evolving agentic-coding methodology — TDD discipline, agent
+orchestration, plans-directory workflow — is being progressively informed
+by [`citypaul/.dotfiles`](https://github.com/citypaul/.dotfiles) by Paul
+Hammond, licensed under MIT. Each file derived from that work carries a
+provenance header pointing back to the upstream commit it was lifted from;
+the audit trail and the upstream license are kept under
+[`THIRD_PARTY_LICENSES/`](./THIRD_PARTY_LICENSES/).
+
 ## License
 
-MIT — see `LICENSE`.
+MIT — see [`LICENSE`](./LICENSE). Third-party material under
+[`THIRD_PARTY_LICENSES/`](./THIRD_PARTY_LICENSES/).

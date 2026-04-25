@@ -10,7 +10,8 @@
     "bin",
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "THIRD_PARTY_LICENSES"
   ],
   "engines": {
     "node": ">=22"
